@@ -8,4 +8,6 @@
 - Guarantees: lane entries require explicit intent, lane-specific content, audit, and project-scoped links.
 - Phase 3.3 foundation implemented: editorial relationships between score events.
 - Guarantees: beat/cut relationships require explicit editorial reasoning and same-branch event links.
+- Phase 3.4 foundation implemented: low-fidelity preview prototypes and preview items.
+- Guarantees: preview items explain score-event purpose for screening without rendering, media generation, or NLE projection.
 - Not built: UI timeline editor, renderer, NLE bridge, AI generation, asset intelligence, preview engine, autonomous agents.

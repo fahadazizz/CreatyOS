@@ -361,6 +361,9 @@ class AudiovisualScoreBranch(TimestampMixin, Base):
     event_relationships: Mapped[list["AudiovisualScoreEventRelationship"]] = relationship(
         back_populates="branch", order_by="AudiovisualScoreEventRelationship.created_at"
     )
+    preview_prototypes: Mapped[list["AudiovisualScorePreviewPrototype"]] = relationship(
+        back_populates="branch", order_by="AudiovisualScorePreviewPrototype.created_at"
+    )
 
 
 class AudiovisualScoreEvent(TimestampMixin, Base):
@@ -463,3 +466,66 @@ class AudiovisualScoreEventRelationship(TimestampMixin, Base):
     )
 
     branch: Mapped[AudiovisualScoreBranch] = relationship(back_populates="event_relationships")
+
+
+class AudiovisualScorePreviewPrototype(TimestampMixin, Base):
+    __tablename__ = "audiovisual_score_preview_prototypes"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    branch_id: Mapped[str] = mapped_column(
+        ForeignKey("audiovisual_score_branches.id"), nullable=False, index=True
+    )
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    created_by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    prototype_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(240), nullable=False)
+    purpose: Mapped[str] = mapped_column(Text, nullable=False)
+    test_question: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="draft", index=True)
+    linked_decision_id: Mapped[str | None] = mapped_column(
+        ForeignKey("decisions.id"), nullable=True, index=True
+    )
+    linked_blackboard_entry_id: Mapped[str | None] = mapped_column(
+        ForeignKey("blackboard_entries.id"), nullable=True, index=True
+    )
+
+    branch: Mapped[AudiovisualScoreBranch] = relationship(back_populates="preview_prototypes")
+    items: Mapped[list["AudiovisualScorePreviewItem"]] = relationship(
+        back_populates="prototype", order_by="AudiovisualScorePreviewItem.sort_key"
+    )
+
+
+class AudiovisualScorePreviewItem(TimestampMixin, Base):
+    __tablename__ = "audiovisual_score_preview_items"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    prototype_id: Mapped[str] = mapped_column(
+        ForeignKey("audiovisual_score_preview_prototypes.id"), nullable=False, index=True
+    )
+    branch_id: Mapped[str] = mapped_column(
+        ForeignKey("audiovisual_score_branches.id"), nullable=False, index=True
+    )
+    score_event_id: Mapped[str] = mapped_column(
+        ForeignKey("audiovisual_score_events.id"), nullable=False, index=True
+    )
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    created_by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    item_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(240), nullable=False)
+    sort_key: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    test_focus: Mapped[str] = mapped_column(Text, nullable=False)
+    inspection_notes: Mapped[str] = mapped_column(Text, nullable=False)
+    score_event_why_snapshot: Mapped[str] = mapped_column(Text, nullable=False)
+    body_json: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="planned", index=True)
+    linked_artifact_version_id: Mapped[str | None] = mapped_column(
+        ForeignKey("artifact_versions.id"), nullable=True, index=True
+    )
+    linked_decision_id: Mapped[str | None] = mapped_column(
+        ForeignKey("decisions.id"), nullable=True, index=True
+    )
+    linked_blackboard_entry_id: Mapped[str | None] = mapped_column(
+        ForeignKey("blackboard_entries.id"), nullable=True, index=True
+    )
+
+    prototype: Mapped[AudiovisualScorePreviewPrototype] = relationship(back_populates="items")

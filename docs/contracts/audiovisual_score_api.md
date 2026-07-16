@@ -11,3 +11,6 @@
 - `POST/GET /api/v1/score-events/{event_id}/relationships`; `GET /api/v1/score-branches/{branch_id}/relationships`; `GET /api/v1/score-relationships/{relationship_id}`.
 - Score relationships require non-empty `rationale`, `expected_viewer_effect`, `timing_logic`, and `continuity_impact`.
 - Score relationships must connect two different events in the same branch; linked proof/decision/artifact references are project-scoped.
+- `POST/GET /api/v1/score-branches/{branch_id}/preview-prototypes`; `GET /api/v1/score-preview-prototypes/{prototype_id}`.
+- `POST/GET /api/v1/score-preview-prototypes/{prototype_id}/items`; `GET /api/v1/score-preview-items/{preview_item_id}`.
+- Preview items require a same-branch score event, non-empty inspection fields, and type-specific body keys; preview records do not create render, asset, or NLE outputs.

@@ -453,6 +453,20 @@ ScoreEventRelationshipType = Literal[
 ]
 ScoreEventRelationshipStatus = Literal["planned", "needs_proof", "approved", "superseded"]
 ScoreEventRelationshipDirection = Literal["outgoing", "incoming", "all"]
+ScorePreviewPrototypeType = Literal["cards", "boards", "animatic_stub", "paper_edit"]
+ScorePreviewPrototypeStatus = Literal["draft", "ready_for_screening", "screened", "superseded"]
+ScorePreviewItemType = Literal[
+    "card",
+    "board",
+    "scratch_narration",
+    "temp_still",
+    "temp_clip",
+    "music_placeholder",
+    "timing",
+    "caption",
+    "rough_transition",
+]
+ScorePreviewItemStatus = Literal["planned", "ready", "needs_revision", "superseded"]
 
 
 BLACKBOARD_PAYLOAD_REQUIREMENTS: dict[BlackboardEntryType, tuple[str, ...]] = {
@@ -486,6 +500,18 @@ SCORE_LANE_CONTENT_REQUIREMENTS: dict[ScoreLaneType, tuple[str, ...]] = {
     "evidence": ("claim", "source_requirement", "proof_status"),
     "production_state": ("requirement", "owner_or_source", "status"),
     "review_notes": ("note", "reviewer_context", "requested_action"),
+}
+
+SCORE_PREVIEW_ITEM_BODY_REQUIREMENTS: dict[ScorePreviewItemType, tuple[str, ...]] = {
+    "card": ("event_summary", "viewer_question", "visible_information"),
+    "board": ("composition", "subject_state", "transition_note"),
+    "scratch_narration": ("text", "delivery_note", "timing_note"),
+    "temp_still": ("description", "source_status", "intent_fit"),
+    "temp_clip": ("description", "source_status", "usage_limit"),
+    "music_placeholder": ("mood_function", "dynamic_shape", "rights_status"),
+    "timing": ("duration_estimate", "elasticity", "sync_target"),
+    "caption": ("text", "readability", "timing_note"),
+    "rough_transition": ("transition_logic", "outgoing_state", "incoming_state"),
 }
 
 
@@ -895,6 +921,89 @@ class AudiovisualScoreEventRelationshipRead(OrmModel):
     expected_viewer_effect: str
     timing_logic: str
     continuity_impact: str
+    status: str
+    linked_artifact_version_id: UUID | None
+    linked_decision_id: UUID | None
+    linked_blackboard_entry_id: UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AudiovisualScorePreviewPrototypeCreate(BaseModel):
+    created_by_user_id: UUID
+    prototype_type: ScorePreviewPrototypeType
+    title: str = Field(min_length=1, max_length=240)
+    purpose: str = Field(min_length=1, max_length=4000)
+    test_question: str = Field(min_length=1, max_length=4000)
+    linked_decision_id: UUID | None = None
+    linked_blackboard_entry_id: UUID | None = None
+
+    _title = field_validator("title")(_strip_nonempty)
+    _purpose = field_validator("purpose")(_strip_nonempty)
+    _test_question = field_validator("test_question")(_strip_nonempty)
+
+
+class AudiovisualScorePreviewPrototypeRead(OrmModel):
+    id: UUID
+    branch_id: UUID
+    project_id: UUID
+    created_by_user_id: UUID
+    prototype_type: str
+    title: str
+    purpose: str
+    test_question: str
+    status: str
+    linked_decision_id: UUID | None
+    linked_blackboard_entry_id: UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AudiovisualScorePreviewItemCreate(BaseModel):
+    created_by_user_id: UUID
+    score_event_id: UUID
+    item_type: ScorePreviewItemType
+    title: str = Field(min_length=1, max_length=240)
+    sort_key: str = Field(min_length=1, max_length=120)
+    test_focus: str = Field(min_length=1, max_length=4000)
+    inspection_notes: str = Field(min_length=1, max_length=4000)
+    body: dict[str, Any]
+    status: ScorePreviewItemStatus = "planned"
+    linked_artifact_version_id: UUID | None = None
+    linked_decision_id: UUID | None = None
+    linked_blackboard_entry_id: UUID | None = None
+
+    _title = field_validator("title")(_strip_nonempty)
+    _sort_key = field_validator("sort_key")(_strip_nonempty)
+    _test_focus = field_validator("test_focus")(_strip_nonempty)
+    _inspection_notes = field_validator("inspection_notes")(_strip_nonempty)
+
+    @model_validator(mode="after")
+    def validate_preview_body(self) -> "AudiovisualScorePreviewItemCreate":
+        if not self.body:
+            raise ValueError("body must not be empty")
+        _require_payload_keys(
+            self.body,
+            self.item_type,
+            SCORE_PREVIEW_ITEM_BODY_REQUIREMENTS[self.item_type],
+        )
+        return self
+
+
+class AudiovisualScorePreviewItemRead(OrmModel):
+    id: UUID
+    prototype_id: UUID
+    branch_id: UUID
+    score_event_id: UUID
+    project_id: UUID
+    created_by_user_id: UUID
+    item_type: str
+    title: str
+    sort_key: str
+    test_focus: str
+    inspection_notes: str
+    score_event_why_snapshot: str
+    body: dict[str, Any]
     status: str
     linked_artifact_version_id: UUID | None
     linked_decision_id: UUID | None

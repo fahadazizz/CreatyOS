@@ -316,6 +316,56 @@ def _score_event_relationship_read(
     )
 
 
+def _score_preview_prototype_read(
+    prototype: models.AudiovisualScorePreviewPrototype,
+) -> schemas.AudiovisualScorePreviewPrototypeRead:
+    return schemas.AudiovisualScorePreviewPrototypeRead.model_validate(
+        {
+            "id": prototype.id,
+            "branch_id": prototype.branch_id,
+            "project_id": prototype.project_id,
+            "created_by_user_id": prototype.created_by_user_id,
+            "prototype_type": prototype.prototype_type,
+            "title": prototype.title,
+            "purpose": prototype.purpose,
+            "test_question": prototype.test_question,
+            "status": prototype.status,
+            "linked_decision_id": prototype.linked_decision_id,
+            "linked_blackboard_entry_id": prototype.linked_blackboard_entry_id,
+            "created_at": prototype.created_at,
+            "updated_at": prototype.updated_at,
+        }
+    )
+
+
+def _score_preview_item_read(
+    item: models.AudiovisualScorePreviewItem,
+) -> schemas.AudiovisualScorePreviewItemRead:
+    return schemas.AudiovisualScorePreviewItemRead.model_validate(
+        {
+            "id": item.id,
+            "prototype_id": item.prototype_id,
+            "branch_id": item.branch_id,
+            "score_event_id": item.score_event_id,
+            "project_id": item.project_id,
+            "created_by_user_id": item.created_by_user_id,
+            "item_type": item.item_type,
+            "title": item.title,
+            "sort_key": item.sort_key,
+            "test_focus": item.test_focus,
+            "inspection_notes": item.inspection_notes,
+            "score_event_why_snapshot": item.score_event_why_snapshot,
+            "body": json.loads(item.body_json),
+            "status": item.status,
+            "linked_artifact_version_id": item.linked_artifact_version_id,
+            "linked_decision_id": item.linked_decision_id,
+            "linked_blackboard_entry_id": item.linked_blackboard_entry_id,
+            "created_at": item.created_at,
+            "updated_at": item.updated_at,
+        }
+    )
+
+
 def _validate_blackboard_targets(
     db: Session,
     *,
@@ -1897,3 +1947,158 @@ def get_score_event_relationship(
     return _score_event_relationship_read(
         _one(db, models.AudiovisualScoreEventRelationship, relationship_id)
     )
+
+
+def create_score_preview_prototype(
+    db: Session, branch_id: str, data: schemas.AudiovisualScorePreviewPrototypeCreate
+) -> schemas.AudiovisualScorePreviewPrototypeRead:
+    branch = _one(db, models.AudiovisualScoreBranch, branch_id)
+    project = _one(db, models.Project, branch.project_id)
+    _one(db, models.User, str(data.created_by_user_id))
+    linked_decision_id = str(data.linked_decision_id) if data.linked_decision_id else None
+    linked_blackboard_entry_id = (
+        str(data.linked_blackboard_entry_id) if data.linked_blackboard_entry_id else None
+    )
+    _validate_score_links(
+        db,
+        project=project,
+        decision_id=linked_decision_id,
+        blackboard_entry_id=linked_blackboard_entry_id,
+    )
+
+    prototype = models.AudiovisualScorePreviewPrototype(
+        branch_id=branch.id,
+        project_id=project.id,
+        created_by_user_id=str(data.created_by_user_id),
+        prototype_type=data.prototype_type,
+        title=data.title,
+        purpose=data.purpose,
+        test_question=data.test_question,
+        status="draft",
+        linked_decision_id=linked_decision_id,
+        linked_blackboard_entry_id=linked_blackboard_entry_id,
+    )
+    db.add(prototype)
+    db.flush()
+    _audit(
+        db,
+        entity_type="audiovisual_score_preview_prototype",
+        entity_id=prototype.id,
+        action="created",
+        actor_user_id=prototype.created_by_user_id,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={
+            "branch_id": prototype.branch_id,
+            "prototype_type": prototype.prototype_type,
+            "status": prototype.status,
+        },
+    )
+    db.commit()
+    db.refresh(prototype)
+    return _score_preview_prototype_read(prototype)
+
+
+def list_score_branch_preview_prototypes(
+    db: Session, branch_id: str
+) -> list[schemas.AudiovisualScorePreviewPrototypeRead]:
+    _one(db, models.AudiovisualScoreBranch, branch_id)
+    prototypes = db.scalars(
+        select(models.AudiovisualScorePreviewPrototype)
+        .where(models.AudiovisualScorePreviewPrototype.branch_id == branch_id)
+        .order_by(models.AudiovisualScorePreviewPrototype.created_at)
+    ).all()
+    return [_score_preview_prototype_read(prototype) for prototype in prototypes]
+
+
+def get_score_preview_prototype(
+    db: Session, prototype_id: str
+) -> schemas.AudiovisualScorePreviewPrototypeRead:
+    return _score_preview_prototype_read(
+        _one(db, models.AudiovisualScorePreviewPrototype, prototype_id)
+    )
+
+
+def create_score_preview_item(
+    db: Session, prototype_id: str, data: schemas.AudiovisualScorePreviewItemCreate
+) -> schemas.AudiovisualScorePreviewItemRead:
+    prototype = _one(db, models.AudiovisualScorePreviewPrototype, prototype_id)
+    score_event = _one(db, models.AudiovisualScoreEvent, str(data.score_event_id))
+    if score_event.branch_id != prototype.branch_id:
+        raise ValidationError("preview item score event must belong to prototype branch")
+
+    project = _one(db, models.Project, prototype.project_id)
+    _one(db, models.User, str(data.created_by_user_id))
+    linked_artifact_version_id = (
+        str(data.linked_artifact_version_id) if data.linked_artifact_version_id else None
+    )
+    linked_decision_id = str(data.linked_decision_id) if data.linked_decision_id else None
+    linked_blackboard_entry_id = (
+        str(data.linked_blackboard_entry_id) if data.linked_blackboard_entry_id else None
+    )
+    _validate_score_links(
+        db,
+        project=project,
+        artifact_version_id=linked_artifact_version_id,
+        decision_id=linked_decision_id,
+        blackboard_entry_id=linked_blackboard_entry_id,
+    )
+
+    item = models.AudiovisualScorePreviewItem(
+        prototype_id=prototype.id,
+        branch_id=prototype.branch_id,
+        score_event_id=score_event.id,
+        project_id=project.id,
+        created_by_user_id=str(data.created_by_user_id),
+        item_type=data.item_type,
+        title=data.title,
+        sort_key=data.sort_key,
+        test_focus=data.test_focus,
+        inspection_notes=data.inspection_notes,
+        score_event_why_snapshot=score_event.why,
+        body_json=json.dumps(data.body, sort_keys=True),
+        status=data.status,
+        linked_artifact_version_id=linked_artifact_version_id,
+        linked_decision_id=linked_decision_id,
+        linked_blackboard_entry_id=linked_blackboard_entry_id,
+    )
+    db.add(item)
+    db.flush()
+    _audit(
+        db,
+        entity_type="audiovisual_score_preview_item",
+        entity_id=item.id,
+        action="created",
+        actor_user_id=item.created_by_user_id,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={
+            "prototype_id": item.prototype_id,
+            "score_event_id": item.score_event_id,
+            "item_type": item.item_type,
+            "status": item.status,
+        },
+    )
+    db.commit()
+    db.refresh(item)
+    return _score_preview_item_read(item)
+
+
+def list_score_preview_items(
+    db: Session, prototype_id: str, item_type: str | None = None
+) -> list[schemas.AudiovisualScorePreviewItemRead]:
+    _one(db, models.AudiovisualScorePreviewPrototype, prototype_id)
+    query = (
+        select(models.AudiovisualScorePreviewItem)
+        .where(models.AudiovisualScorePreviewItem.prototype_id == prototype_id)
+        .order_by(models.AudiovisualScorePreviewItem.sort_key)
+    )
+    if item_type is not None:
+        query = query.where(models.AudiovisualScorePreviewItem.item_type == item_type)
+    return [_score_preview_item_read(item) for item in db.scalars(query).all()]
+
+
+def get_score_preview_item(
+    db: Session, preview_item_id: str
+) -> schemas.AudiovisualScorePreviewItemRead:
+    return _score_preview_item_read(_one(db, models.AudiovisualScorePreviewItem, preview_item_id))

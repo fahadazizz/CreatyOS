@@ -658,3 +658,85 @@ async def get_score_event_relationship(
         return services.get_score_event_relationship(db, str(relationship_id))
     except Exception as exc:
         _handle_error(exc)
+
+
+@router.post(
+    "/score-branches/{branch_id}/preview-prototypes",
+    response_model=schemas.AudiovisualScorePreviewPrototypeRead,
+    status_code=201,
+)
+async def create_score_preview_prototype(
+    branch_id: UUID,
+    payload: schemas.AudiovisualScorePreviewPrototypeCreate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.create_score_preview_prototype(db, str(branch_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/score-branches/{branch_id}/preview-prototypes",
+    response_model=list[schemas.AudiovisualScorePreviewPrototypeRead],
+)
+async def list_score_branch_preview_prototypes(
+    branch_id: UUID, db: Session = Depends(get_db)
+):
+    try:
+        return services.list_score_branch_preview_prototypes(db, str(branch_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/score-preview-prototypes/{prototype_id}",
+    response_model=schemas.AudiovisualScorePreviewPrototypeRead,
+)
+async def get_score_preview_prototype(prototype_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.get_score_preview_prototype(db, str(prototype_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.post(
+    "/score-preview-prototypes/{prototype_id}/items",
+    response_model=schemas.AudiovisualScorePreviewItemRead,
+    status_code=201,
+)
+async def create_score_preview_item(
+    prototype_id: UUID,
+    payload: schemas.AudiovisualScorePreviewItemCreate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.create_score_preview_item(db, str(prototype_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/score-preview-prototypes/{prototype_id}/items",
+    response_model=list[schemas.AudiovisualScorePreviewItemRead],
+)
+async def list_score_preview_items(
+    prototype_id: UUID,
+    item_type: schemas.ScorePreviewItemType | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.list_score_preview_items(db, str(prototype_id), item_type=item_type)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/score-preview-items/{preview_item_id}",
+    response_model=schemas.AudiovisualScorePreviewItemRead,
+)
+async def get_score_preview_item(preview_item_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.get_score_preview_item(db, str(preview_item_id))
+    except Exception as exc:
+        _handle_error(exc)
