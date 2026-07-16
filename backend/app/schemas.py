@@ -156,6 +156,18 @@ ArtifactType = Literal[
 
 ConfidenceLevel = Literal["low", "medium", "high"]
 DecisionStatus = Literal["proposed", "accepted", "rejected", "superseded"]
+CreativeInputType = Literal[
+    "raw_brief",
+    "script",
+    "research_notes",
+    "reference",
+    "brand_constraints",
+    "audience_notes",
+    "deliverables",
+    "liked_example",
+    "disliked_example",
+]
+CandidateState = Literal["candidate"]
 
 
 class ArtifactCreate(BaseModel):
@@ -286,3 +298,43 @@ class DecisionRead(OrmModel):
 
 class DecisionStatusUpdate(BaseModel):
     status: DecisionStatus
+
+
+class CreativeInputCreate(BaseModel):
+    submitted_by_user_id: UUID
+    input_type: CreativeInputType
+    title: str = Field(min_length=1, max_length=240)
+    body: dict[str, Any]
+    source_label: str | None = Field(default=None, max_length=240)
+    production_id: UUID | None = None
+    piece_id: UUID | None = None
+
+    _title = field_validator("title")(_strip_nonempty)
+
+    @field_validator("body")
+    @classmethod
+    def validate_body(cls, value: dict[str, Any]) -> dict[str, Any]:
+        if not value:
+            raise ValueError("body must not be empty")
+        return value
+
+    @field_validator("source_label")
+    @classmethod
+    def validate_source_label(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        return _strip_nonempty(value)
+
+
+class CreativeInputRead(OrmModel):
+    id: UUID
+    project_id: UUID
+    production_id: UUID | None
+    piece_id: UUID | None
+    submitted_by_user_id: UUID
+    input_type: str
+    title: str
+    source_label: str | None
+    candidate_state: CandidateState
+    body: dict[str, Any]
+    created_at: datetime

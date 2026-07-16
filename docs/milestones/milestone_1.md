@@ -1,6 +1,6 @@
 # Milestone 1 - Foundation Monolith
 
-**Status:** in progress  
+**Status:** complete  
 **Canonical architecture:** `docs/creative_director_os_reference_architecture.md`  
 **Build plan section:** Milestone 1 - Foundation monolith
 
@@ -118,9 +118,9 @@ Out of scope:
 
 ## Phase 1.4 - Creative Brief Ingestion Shell
 
-**Status:** not started
+**Status:** implemented
 
-### Planned Outputs
+### Outputs
 
 - Deterministic storage for raw brief, script, research notes, references, brand constraints, audience notes, deliverables, and examples.
 - No AI extraction in this phase.
@@ -130,7 +130,9 @@ Out of scope:
 
 - Script and brief inputs are stored as inputs, never source of truth.
 - Extracted or structured candidates cannot mutate Living Film Model artifacts without a later gate.
+- Script is accepted as a creative input type but remains forbidden as a Living Film Model artifact type.
+- Creative input creation writes audit events.
 
 ## Milestone Exit Criteria
 
-Milestone 1 is complete when the system can create a project, ingest messy creative input, produce structured creative artifacts, track decisions, and maintain versions. No video generation is required.
+Milestone 1 is complete. The system can create a project, ingest messy creative input as candidate-only records, produce structured Living Film Model artifacts, track decisions, and maintain append-only versions. No video generation is implemented or required.

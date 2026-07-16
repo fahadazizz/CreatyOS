@@ -198,3 +198,42 @@ async def update_decision_status(
         return services.update_decision_status(db, str(decision_id), payload)
     except Exception as exc:
         _handle_error(exc)
+
+
+@router.post(
+    "/projects/{project_id}/creative-inputs",
+    response_model=schemas.CreativeInputRead,
+    status_code=201,
+)
+async def create_creative_input(
+    project_id: UUID, payload: schemas.CreativeInputCreate, db: Session = Depends(get_db)
+):
+    try:
+        return services.create_creative_input(db, str(project_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/projects/{project_id}/creative-inputs",
+    response_model=list[schemas.CreativeInputRead],
+)
+async def list_project_creative_inputs(
+    project_id: UUID,
+    input_type: schemas.CreativeInputType | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.list_project_creative_inputs(
+            db, str(project_id), input_type=input_type
+        )
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get("/creative-inputs/{creative_input_id}", response_model=schemas.CreativeInputRead)
+async def get_creative_input(creative_input_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.get_creative_input(db, str(creative_input_id))
+    except Exception as exc:
+        _handle_error(exc)

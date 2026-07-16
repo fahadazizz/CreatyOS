@@ -58,6 +58,15 @@ Phase 1.3 decision log tests verify:
 - artifact versions can link only to existing decisions;
 - linked decisions must be project-compatible.
 
+Phase 1.4 creative input tests verify:
+
+- script can be stored as candidate input;
+- script still cannot be a Living Film Model artifact type;
+- creative input creation does not create artifacts;
+- creative input list/get/filter behavior;
+- non-empty body validation;
+- creative input audit events.
+
 Run Alembic migrations:
 
 ```bash

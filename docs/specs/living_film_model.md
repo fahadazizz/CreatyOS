@@ -8,7 +8,7 @@
 
 The Living Film Model is the source of truth for the authored work. It is a versioned family of typed artifacts and relationships, not a script, prompt, chat transcript, timeline, or rendered file.
 
-This initial implementation creates the first durable artifact/version layer and decision log needed before ingestion behavior exists.
+This initial implementation creates the first durable artifact/version layer, decision log, and candidate-only creative input storage.
 
 ## Implemented Artifact Types
 
@@ -78,21 +78,37 @@ Decisions are first-class project-scoped records. They capture:
 
 Decision records prevent creative choices from being buried in chat history. Artifact versions may link to accepted, proposed, rejected, or superseded decisions so later phases can trace source-of-truth changes to their rationale.
 
+## Creative Inputs
+
+Creative inputs store messy material as candidates only:
+
+- raw brief;
+- script;
+- research notes;
+- references;
+- brand constraints;
+- audience notes;
+- deliverable notes;
+- liked examples;
+- disliked examples.
+
+Creative inputs are not Living Film Model artifacts. Creating one does not create an artifact, create a version, create a decision, or mutate source of truth.
+
 ## Source-of-Truth Rule
 
 A script, brief, prompt, model output, or note does not become Living Film Model truth by being submitted to the system. It becomes durable source-of-truth only when a typed artifact version is explicitly created and validated.
 
-`script` is intentionally not an artifact type in Phase 1.2.
+`script` is intentionally not an artifact type. It is allowed only as a candidate creative input.
 
 ## Current Limits
 
-Phase 1.3 validates artifact type, ownership, project scope, non-empty version body, schema version, confidence level, parent version scope, linked decision scope, linked evidence text, open question text, decision alternatives, rationale, selected option, status, evidence, risk, and affected scope.
+Phase 1 validates artifact type, ownership, project scope, non-empty version body, schema version, confidence level, parent version scope, linked decision scope, linked evidence text, open question text, decision alternatives, rationale, selected option, status, evidence, risk, affected scope, creative input type, and creative input candidate body.
 
 It does not yet implement:
 
 - schema-specific body validation for each artifact type;
 - evidence registry persistence;
 - approval gates;
-- creative brief ingestion;
+- AI extraction from creative inputs;
 - Studio Brain proposals;
 - review workflows.

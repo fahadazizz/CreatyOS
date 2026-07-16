@@ -96,6 +96,24 @@ def _decision_read(decision: models.Decision) -> schemas.DecisionRead:
     )
 
 
+def _creative_input_read(creative_input: models.CreativeInput) -> schemas.CreativeInputRead:
+    return schemas.CreativeInputRead.model_validate(
+        {
+            "id": creative_input.id,
+            "project_id": creative_input.project_id,
+            "production_id": creative_input.production_id,
+            "piece_id": creative_input.piece_id,
+            "submitted_by_user_id": creative_input.submitted_by_user_id,
+            "input_type": creative_input.input_type,
+            "title": creative_input.title,
+            "source_label": creative_input.source_label,
+            "candidate_state": creative_input.candidate_state,
+            "body": json.loads(creative_input.body_json),
+            "created_at": creative_input.created_at,
+        }
+    )
+
+
 def create_workspace(db: Session, data: schemas.WorkspaceCreate) -> models.Workspace:
     workspace = models.Workspace(name=data.name, slug=data.slug)
     db.add(workspace)
@@ -505,3 +523,75 @@ def update_decision_status(
     db.commit()
     db.refresh(decision)
     return _decision_read(decision)
+
+
+def create_creative_input(
+    db: Session, project_id: str, data: schemas.CreativeInputCreate
+) -> schemas.CreativeInputRead:
+    project = _one(db, models.Project, project_id)
+    _one(db, models.User, str(data.submitted_by_user_id))
+
+    production_id = str(data.production_id) if data.production_id else None
+    piece_id = str(data.piece_id) if data.piece_id else None
+
+    if production_id is not None:
+        production = _one(db, models.Production, production_id)
+        if production.project_id != project.id:
+            raise ValidationError("production does not belong to project")
+
+    if piece_id is not None:
+        piece = _one(db, models.Piece, piece_id)
+        production = _one(db, models.Production, piece.production_id)
+        if production.project_id != project.id:
+            raise ValidationError("piece does not belong to project")
+        if production_id is not None and piece.production_id != production_id:
+            raise ValidationError("piece does not belong to production")
+
+    creative_input = models.CreativeInput(
+        project_id=project.id,
+        production_id=production_id,
+        piece_id=piece_id,
+        submitted_by_user_id=str(data.submitted_by_user_id),
+        input_type=data.input_type,
+        title=data.title,
+        source_label=data.source_label,
+        candidate_state="candidate",
+        body_json=json.dumps(data.body, sort_keys=True),
+    )
+    db.add(creative_input)
+    db.flush()
+    _audit(
+        db,
+        entity_type="creative_input",
+        entity_id=creative_input.id,
+        action="created",
+        actor_user_id=creative_input.submitted_by_user_id,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={
+            "input_type": creative_input.input_type,
+            "title": creative_input.title,
+            "candidate_state": creative_input.candidate_state,
+        },
+    )
+    db.commit()
+    db.refresh(creative_input)
+    return _creative_input_read(creative_input)
+
+
+def list_project_creative_inputs(
+    db: Session, project_id: str, input_type: str | None = None
+) -> list[schemas.CreativeInputRead]:
+    _one(db, models.Project, project_id)
+    query = (
+        select(models.CreativeInput)
+        .where(models.CreativeInput.project_id == project_id)
+        .order_by(models.CreativeInput.created_at)
+    )
+    if input_type is not None:
+        query = query.where(models.CreativeInput.input_type == input_type)
+    return [_creative_input_read(item) for item in db.scalars(query).all()]
+
+
+def get_creative_input(db: Session, creative_input_id: str) -> schemas.CreativeInputRead:
+    return _creative_input_read(_one(db, models.CreativeInput, creative_input_id))

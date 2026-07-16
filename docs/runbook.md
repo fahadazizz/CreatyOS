@@ -86,3 +86,17 @@ curl -X PATCH http://localhost:8000/api/v1/decisions/{decision_id}/status \
   -H "Content-Type: application/json" \
   -d '{"status":"accepted"}'
 ```
+
+Create a candidate creative input:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/projects/{project_id}/creative-inputs \
+  -H "Content-Type: application/json" \
+  -d '{"submitted_by_user_id":"{user_id}","input_type":"script","title":"Submitted Script","body":{"raw_text":"Script candidate only."}}'
+```
+
+List candidate creative inputs:
+
+```bash
+curl http://localhost:8000/api/v1/projects/{project_id}/creative-inputs
+```

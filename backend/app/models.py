@@ -57,6 +57,7 @@ class Project(TimestampMixin, Base):
     productions: Mapped[list["Production"]] = relationship(back_populates="project")
     artifacts: Mapped[list["Artifact"]] = relationship(back_populates="project")
     decisions: Mapped[list["Decision"]] = relationship(back_populates="project")
+    creative_inputs: Mapped[list["CreativeInput"]] = relationship(back_populates="project")
 
 
 class Production(TimestampMixin, Base):
@@ -181,3 +182,25 @@ class Decision(TimestampMixin, Base):
     affected_scope_json: Mapped[str] = mapped_column(Text, nullable=False)
 
     project: Mapped[Project] = relationship(back_populates="decisions")
+
+
+class CreativeInput(Base):
+    __tablename__ = "creative_inputs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    production_id: Mapped[str | None] = mapped_column(
+        ForeignKey("productions.id"), nullable=True, index=True
+    )
+    piece_id: Mapped[str | None] = mapped_column(ForeignKey("pieces.id"), nullable=True, index=True)
+    submitted_by_user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    input_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(240), nullable=False)
+    source_label: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    candidate_state: Mapped[str] = mapped_column(String(40), nullable=False, default="candidate")
+    body_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    project: Mapped[Project] = relationship(back_populates="creative_inputs")
