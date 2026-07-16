@@ -15,7 +15,7 @@ def _handle_error(exc: Exception) -> None:
     if isinstance(exc, services.ConflictError):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     if isinstance(exc, services.ValidationError):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     raise exc
 
 
@@ -156,5 +156,45 @@ async def create_artifact_version(
 async def list_artifact_versions(artifact_id: UUID, db: Session = Depends(get_db)):
     try:
         return services.list_artifact_versions(db, str(artifact_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.post(
+    "/projects/{project_id}/decisions",
+    response_model=schemas.DecisionRead,
+    status_code=201,
+)
+async def create_decision(
+    project_id: UUID, payload: schemas.DecisionCreate, db: Session = Depends(get_db)
+):
+    try:
+        return services.create_decision(db, str(project_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get("/projects/{project_id}/decisions", response_model=list[schemas.DecisionRead])
+async def list_project_decisions(project_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.list_project_decisions(db, str(project_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get("/decisions/{decision_id}", response_model=schemas.DecisionRead)
+async def get_decision(decision_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.get_decision(db, str(decision_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.patch("/decisions/{decision_id}/status", response_model=schemas.DecisionRead)
+async def update_decision_status(
+    decision_id: UUID, payload: schemas.DecisionStatusUpdate, db: Session = Depends(get_db)
+):
+    try:
+        return services.update_decision_status(db, str(decision_id), payload)
     except Exception as exc:
         _handle_error(exc)

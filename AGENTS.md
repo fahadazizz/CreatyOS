@@ -9,7 +9,7 @@
 ## 2. Docs Map
 - `docs/creative_director_os_build_plan.md`: milestone roadmap and build order.
 - `docs/creative_director_os_reference_architecture.md`: system boundaries, layers, and invariants.
-- `docs/milestones/`: one file per milestone with phases and acceptance criteria.
+- `docs/milestones/`: one file per milestone with phases and acceptance criteria. Updated only when a whole milestones is finished and tested
 - `docs/specs/`: feature, data, API, agent, workflow, and UI-interface specs.
 - `docs/contracts/`: schemas, API contracts, event contracts, model I/O contracts.
 - `docs/decisions/`: ADRs for architecture/product decisions.

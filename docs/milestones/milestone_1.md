@@ -99,9 +99,9 @@ Out of scope:
 
 ## Phase 1.3 - Decision Log
 
-**Status:** not started
+**Status:** implemented
 
-### Planned Outputs
+### Outputs
 
 - Decision contracts and table.
 - Decision service and API routes.
@@ -113,6 +113,8 @@ Out of scope:
 
 - Creative decisions are first-class records, not chat history.
 - Each meaningful decision captures alternatives considered, reason selected, evidence, risks, owner, status, and downstream effect.
+- Decision status changes produce audit events.
+- Artifact versions can link only to decisions in the same project.
 
 ## Phase 1.4 - Creative Brief Ingestion Shell
 

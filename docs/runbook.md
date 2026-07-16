@@ -70,3 +70,19 @@ curl -X POST http://localhost:8000/api/v1/artifacts/{artifact_id}/versions \
   -H "Content-Type: application/json" \
   -d '{"schema_version":"creative_problem.v1","author_user_id":"{user_id}","confidence_level":"medium","body":{"objective":"define the creative problem"}}'
 ```
+
+Create a decision:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/projects/{project_id}/decisions \
+  -H "Content-Type: application/json" \
+  -d '{"owner_user_id":"{user_id}","title":"Select route","decision_text":"Choose the direction-first route.","alternatives_considered":["Direction-first route","Script assembly"],"selected_option":"Direction-first route","rationale":"It preserves source-of-truth boundaries.","affected_scope":{"artifacts":["{artifact_id}"]}}'
+```
+
+Change decision status:
+
+```bash
+curl -X PATCH http://localhost:8000/api/v1/decisions/{decision_id}/status \
+  -H "Content-Type: application/json" \
+  -d '{"status":"accepted"}'
+```

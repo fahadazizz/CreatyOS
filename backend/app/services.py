@@ -73,6 +73,29 @@ def _artifact_version_read(version: models.ArtifactVersion) -> schemas.ArtifactV
     )
 
 
+def _decision_read(decision: models.Decision) -> schemas.DecisionRead:
+    return schemas.DecisionRead.model_validate(
+        {
+            "id": decision.id,
+            "project_id": decision.project_id,
+            "owner_user_id": decision.owner_user_id,
+            "target_artifact_id": decision.target_artifact_id,
+            "target_artifact_version_id": decision.target_artifact_version_id,
+            "title": decision.title,
+            "decision_text": decision.decision_text,
+            "alternatives_considered": json.loads(decision.alternatives_json),
+            "selected_option": decision.selected_option,
+            "rationale": decision.rationale,
+            "evidence": json.loads(decision.evidence_json),
+            "risks": json.loads(decision.risks_json),
+            "affected_scope": json.loads(decision.affected_scope_json),
+            "status": decision.status,
+            "created_at": decision.created_at,
+            "updated_at": decision.updated_at,
+        }
+    )
+
+
 def create_workspace(db: Session, data: schemas.WorkspaceCreate) -> models.Workspace:
     workspace = models.Workspace(name=data.name, slug=data.slug)
     db.add(workspace)
@@ -325,6 +348,11 @@ def create_artifact_version(
         if parent.artifact_id != artifact.id:
             raise ValidationError("parent version does not belong to artifact")
 
+    for decision_id in data.linked_decisions:
+        decision = _one(db, models.Decision, str(decision_id))
+        if decision.project_id != project.id:
+            raise ValidationError("linked decision does not belong to artifact project")
+
     latest_number = db.scalar(
         select(models.ArtifactVersion.version_number)
         .where(models.ArtifactVersion.artifact_id == artifact.id)
@@ -375,3 +403,105 @@ def list_artifact_versions(db: Session, artifact_id: str) -> list[schemas.Artifa
         .order_by(models.ArtifactVersion.version_number)
     ).all()
     return [_artifact_version_read(version) for version in versions]
+
+
+def create_decision(
+    db: Session, project_id: str, data: schemas.DecisionCreate
+) -> schemas.DecisionRead:
+    project = _one(db, models.Project, project_id)
+    _one(db, models.User, str(data.owner_user_id))
+
+    alternatives = data.alternatives_considered
+    if data.selected_option not in alternatives:
+        raise ValidationError("selected_option must be one of alternatives_considered")
+
+    target_artifact_id = str(data.target_artifact_id) if data.target_artifact_id else None
+    target_artifact_version_id = (
+        str(data.target_artifact_version_id) if data.target_artifact_version_id else None
+    )
+
+    if target_artifact_id is not None:
+        artifact = _one(db, models.Artifact, target_artifact_id)
+        if artifact.project_id != project.id:
+            raise ValidationError("target artifact does not belong to project")
+
+    if target_artifact_version_id is not None:
+        artifact_version = _one(db, models.ArtifactVersion, target_artifact_version_id)
+        version_artifact = _one(db, models.Artifact, artifact_version.artifact_id)
+        if version_artifact.project_id != project.id:
+            raise ValidationError("target artifact version does not belong to project")
+        if target_artifact_id is not None and artifact_version.artifact_id != target_artifact_id:
+            raise ValidationError("target artifact version does not belong to target artifact")
+
+    decision = models.Decision(
+        project_id=project.id,
+        owner_user_id=str(data.owner_user_id),
+        target_artifact_id=target_artifact_id,
+        target_artifact_version_id=target_artifact_version_id,
+        title=data.title,
+        decision_text=data.decision_text,
+        selected_option=data.selected_option,
+        rationale=data.rationale,
+        status=data.status,
+        alternatives_json=json.dumps(alternatives),
+        evidence_json=json.dumps(data.evidence),
+        risks_json=json.dumps(data.risks),
+        affected_scope_json=json.dumps(data.affected_scope, sort_keys=True),
+    )
+    db.add(decision)
+    db.flush()
+    _audit(
+        db,
+        entity_type="decision",
+        entity_id=decision.id,
+        action="created",
+        actor_user_id=decision.owner_user_id,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={
+            "title": decision.title,
+            "status": decision.status,
+            "target_artifact_id": decision.target_artifact_id,
+            "target_artifact_version_id": decision.target_artifact_version_id,
+        },
+    )
+    db.commit()
+    db.refresh(decision)
+    return _decision_read(decision)
+
+
+def list_project_decisions(db: Session, project_id: str) -> list[schemas.DecisionRead]:
+    _one(db, models.Project, project_id)
+    decisions = db.scalars(
+        select(models.Decision)
+        .where(models.Decision.project_id == project_id)
+        .order_by(models.Decision.created_at)
+    ).all()
+    return [_decision_read(decision) for decision in decisions]
+
+
+def get_decision(db: Session, decision_id: str) -> schemas.DecisionRead:
+    return _decision_read(_one(db, models.Decision, decision_id))
+
+
+def update_decision_status(
+    db: Session, decision_id: str, data: schemas.DecisionStatusUpdate
+) -> schemas.DecisionRead:
+    decision = _one(db, models.Decision, decision_id)
+    old_status = decision.status
+    decision.status = data.status
+    db.flush()
+    project = _one(db, models.Project, decision.project_id)
+    _audit(
+        db,
+        entity_type="decision",
+        entity_id=decision.id,
+        action="status_changed",
+        actor_user_id=decision.owner_user_id,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={"old_status": old_status, "new_status": decision.status},
+    )
+    db.commit()
+    db.refresh(decision)
+    return _decision_read(decision)

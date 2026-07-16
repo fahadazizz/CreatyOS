@@ -56,6 +56,7 @@ class Project(TimestampMixin, Base):
     owner: Mapped[User] = relationship(back_populates="owned_projects")
     productions: Mapped[list["Production"]] = relationship(back_populates="project")
     artifacts: Mapped[list["Artifact"]] = relationship(back_populates="project")
+    decisions: Mapped[list["Decision"]] = relationship(back_populates="project")
 
 
 class Production(TimestampMixin, Base):
@@ -155,3 +156,28 @@ class ArtifactVersion(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     artifact: Mapped[Artifact] = relationship(back_populates="versions")
+
+
+class Decision(TimestampMixin, Base):
+    __tablename__ = "decisions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    target_artifact_id: Mapped[str | None] = mapped_column(
+        ForeignKey("artifacts.id"), nullable=True, index=True
+    )
+    target_artifact_version_id: Mapped[str | None] = mapped_column(
+        ForeignKey("artifact_versions.id"), nullable=True, index=True
+    )
+    title: Mapped[str] = mapped_column(String(240), nullable=False)
+    decision_text: Mapped[str] = mapped_column(Text, nullable=False)
+    selected_option: Mapped[str] = mapped_column(String(500), nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="proposed")
+    alternatives_json: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    risks_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    affected_scope_json: Mapped[str] = mapped_column(Text, nullable=False)
+
+    project: Mapped[Project] = relationship(back_populates="decisions")

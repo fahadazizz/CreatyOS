@@ -50,6 +50,14 @@ Phase 1.2 artifact/version tests verify:
 - prior versions remain readable;
 - artifact and artifact version audit events.
 
+Phase 1.3 decision log tests verify:
+
+- decision creation, listing, and fetch;
+- selected option must be one of the alternatives considered;
+- status changes produce audit events;
+- artifact versions can link only to existing decisions;
+- linked decisions must be project-compatible.
+
 Run Alembic migrations:
 
 ```bash

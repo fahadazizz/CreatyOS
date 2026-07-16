@@ -47,7 +47,7 @@ Supported artifact types:
 - `parent_version_id`: optional version UUID from the same artifact.
 - `confidence_level`: `low`, `medium`, or `high`.
 - `body`: non-empty JSON object.
-- `linked_decisions`: list of decision UUIDs. The decision table is not implemented yet.
+- `linked_decisions`: list of decision UUIDs.
 - `linked_evidence`: list of evidence references.
 - `open_questions`: list of open question strings.
 - `created_at`: timestamp.
@@ -72,6 +72,7 @@ Supported artifact types:
 - Version schema version must be non-empty.
 - Version confidence level must be `low`, `medium`, or `high`.
 - Parent version, when supplied, must belong to the same artifact.
+- Linked decisions must exist and belong to the artifact project.
 - Open questions and linked evidence entries must not be blank.
 
 ## Versioning Rules
@@ -93,7 +94,6 @@ Audit events are written for:
 
 This phase does not implement:
 
-- decision log persistence;
 - evidence registry persistence;
 - creative brief or script ingestion;
 - schema-specific body validation beyond required non-empty JSON;

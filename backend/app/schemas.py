@@ -155,6 +155,7 @@ ArtifactType = Literal[
 ]
 
 ConfidenceLevel = Literal["low", "medium", "high"]
+DecisionStatus = Literal["proposed", "accepted", "rejected", "superseded"]
 
 
 class ArtifactCreate(BaseModel):
@@ -224,3 +225,64 @@ class ArtifactVersionRead(OrmModel):
     linked_evidence: list[str]
     open_questions: list[str]
     created_at: datetime
+
+
+class DecisionCreate(BaseModel):
+    owner_user_id: UUID
+    title: str = Field(min_length=1, max_length=240)
+    decision_text: str = Field(min_length=1, max_length=4000)
+    alternatives_considered: list[str] = Field(min_length=1, max_length=25)
+    selected_option: str = Field(min_length=1, max_length=500)
+    rationale: str = Field(min_length=1, max_length=4000)
+    evidence: list[str] = Field(default_factory=list, max_length=100)
+    risks: list[str] = Field(default_factory=list, max_length=100)
+    affected_scope: dict[str, Any]
+    target_artifact_id: UUID | None = None
+    target_artifact_version_id: UUID | None = None
+    status: DecisionStatus = "proposed"
+
+    _title = field_validator("title")(_strip_nonempty)
+    _decision_text = field_validator("decision_text")(_strip_nonempty)
+    _selected_option = field_validator("selected_option")(_strip_nonempty)
+    _rationale = field_validator("rationale")(_strip_nonempty)
+
+    @field_validator("alternatives_considered", "evidence", "risks")
+    @classmethod
+    def validate_string_items(cls, value: list[str]) -> list[str]:
+        cleaned = []
+        for item in value:
+            stripped = item.strip()
+            if not stripped:
+                raise ValueError("list items must not be empty")
+            cleaned.append(stripped)
+        return cleaned
+
+    @field_validator("affected_scope")
+    @classmethod
+    def validate_affected_scope(cls, value: dict[str, Any]) -> dict[str, Any]:
+        if not value:
+            raise ValueError("affected_scope must not be empty")
+        return value
+
+
+class DecisionRead(OrmModel):
+    id: UUID
+    project_id: UUID
+    owner_user_id: UUID
+    target_artifact_id: UUID | None
+    target_artifact_version_id: UUID | None
+    title: str
+    decision_text: str
+    alternatives_considered: list[str]
+    selected_option: str
+    rationale: str
+    evidence: list[str]
+    risks: list[str]
+    affected_scope: dict[str, Any]
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class DecisionStatusUpdate(BaseModel):
+    status: DecisionStatus
