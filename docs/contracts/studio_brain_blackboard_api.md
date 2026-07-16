@@ -1,7 +1,7 @@
 # Studio Brain Blackboard API Contract
 
 **Milestone:** 2  
-**Phase:** 2.1 - Blackboard Architecture  
+**Phase:** 2.1-2.4 - Studio Brain v1
 **Status:** implemented
 
 ## Purpose
@@ -96,7 +96,7 @@ Deliberation record fields:
 - `recommended_next_action`: non-empty string.
 - `rationale`: non-empty string.
 - `result`: optional JSON object.
-- `status`: currently `open`.
+- `status`: `open`, `recorded`, or `superseded`.
 - `created_at`: timestamp.
 - `updated_at`: timestamp.
 
@@ -115,12 +115,14 @@ Deliberation record fields:
 - `GET /api/v1/specialist-proposals/{proposal_id}`
 - `POST /api/v1/projects/{project_id}/human-checkpoints`
 - `GET /api/v1/projects/{project_id}/human-checkpoints`
+- `GET /api/v1/projects/{project_id}/human-checkpoints/readiness`
 - `GET /api/v1/human-checkpoints/{checkpoint_id}`
 - `PATCH /api/v1/human-checkpoints/{checkpoint_id}/decision`
 
 The blackboard list route supports optional filtering by `entry_type` and `status`.
 Specialist proposals support `creative_director`, `story_argument`, `editorial`, `visual_direction`, `sound_direction`, `producer`, and `critic`; each proposal creates a linked blackboard `proposal` entry and has status `submitted`.
 Human checkpoints support `project_thesis`, `creative_route`, `audience_promise`, `final_treatment`, `visual_language`, `production_plan`, `edit_direction`, and `final_release`; decisions require a human user and rationale.
+Controller runs return `scoring_policy_version`; checkpoint decisions are single-decision records and readiness requires all checkpoint types approved.
 
 ## Validation Rules
 
@@ -131,6 +133,7 @@ Human checkpoints support `project_thesis`, `creative_route`, `audience_promise`
 - If both artifact and artifact version targets are supplied, the artifact version must belong to that artifact.
 - Deliberation linked entries must exist and belong to the deliberation project.
 - Duplicate deliberation linked entry IDs are rejected.
+- Checkpoint decisions cannot overwrite a previously decided checkpoint.
 
 ## Source-of-Truth Rules
 
@@ -138,6 +141,7 @@ Human checkpoints support `project_thesis`, `creative_route`, `audience_promise`
 - Deliberation records are reasoning records, not approvals.
 - Creating blackboard entries does not create or update artifacts, artifact versions, decisions, creative inputs, production records, or execution jobs.
 - Creating deliberation records does not accept proposals, resolve proof requests, mutate decisions, or approve production.
+- Creating or deciding checkpoints does not mutate source-of-truth records.
 
 ## Audit Rules
 
@@ -146,14 +150,6 @@ Audit events are written for:
 - blackboard entry creation;
 - blackboard entry status changes;
 - deliberation record creation.
-
-## Explicit Non-Goals
-
-Phase 2.1 does not implement:
-
-- specialist agents;
-- model calls;
-- automatic proposal ranking;
-- human approval checkpoints;
-- task execution;
-- rendering, NLE, review, or AI generation behavior.
+- deliberation controller runs;
+- specialist proposal submission;
+- human checkpoint creation and decisions.

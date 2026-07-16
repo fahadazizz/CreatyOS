@@ -15,8 +15,8 @@ In scope:
 - project blackboard;
 - structured observations, proposals, contradictions, missing information, risks, issues, proof requests, and task recommendations;
 - deliberation records;
-- future specialist proposal contracts;
-- future human checkpoint protocol.
+- specialist proposal contracts;
+- human checkpoint protocol.
 
 Out of scope:
 
@@ -76,6 +76,7 @@ Out of scope:
 - Stores mandatory human checkpoint records for all planned checkpoint types.
 - Human decisions require accountable user and rationale.
 - Checkpoints are auditable and do not mutate source-of-truth records.
+- Hardening adds single-decision checkpoints, readiness checks, explicit controller scoring policy, and DB state constraints.
 
 ## Milestone Exit Criteria
 

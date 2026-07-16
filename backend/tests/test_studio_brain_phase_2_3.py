@@ -130,6 +130,8 @@ async def test_deliberation_controller_ranks_open_entries_and_records_run(
     assert body["deliberation_record"]["status"] == "recorded"
     assert body["deliberation_record"]["linked_entry_ids"] == [proof_request["id"]]
     assert body["deliberation_record"]["result"]["controller"] == "deterministic_v1"
+    assert body["scoring_policy_version"] == "deterministic_v1"
+    assert body["selected_candidate"]["scoring_policy_version"] == "deterministic_v1"
 
     audit_events = await client.get(f"/api/v1/audit-events?project_id={project_id}")
     assert audit_events.status_code == 200
@@ -188,3 +190,86 @@ async def test_deliberation_controller_does_not_mutate_source_of_truth(
     assert artifacts.json() == []
     assert decisions.json() == []
     assert creative_inputs.json() == []
+
+
+@pytest.mark.anyio
+async def test_deliberation_controller_scores_every_blackboard_entry_type(
+    client: httpx.AsyncClient,
+) -> None:
+    project_id, user_id = await _project_context(client)
+    payloads = [
+        {
+            "entry_type": "proposal",
+            "title": "Proposal",
+            "summary": "Proposal summary",
+            "rationale": "Proposal rationale",
+            "confidence_level": "medium",
+            "severity": "medium",
+            "payload": {
+                "proposal_type": "next_action",
+                "recommended_action": "Try a proof.",
+                "expected_impact": "Clarifies route.",
+            },
+        },
+        {
+            "entry_type": "contradiction",
+            "title": "Contradiction",
+            "summary": "Contradiction summary",
+            "rationale": "Contradiction rationale",
+            "confidence_level": "medium",
+            "severity": "medium",
+            "payload": {"contradiction": "Promise conflicts with tone.", "conflicts_with": ["route"]},
+        },
+        {
+            "entry_type": "missing_information",
+            "title": "Missing info",
+            "summary": "Missing info summary",
+            "rationale": "Missing info rationale",
+            "confidence_level": "medium",
+            "severity": "medium",
+            "payload": {"question": "Who is the audience?", "needed_for": "Audience promise"},
+        },
+        {
+            "entry_type": "issue",
+            "title": "Issue",
+            "summary": "Issue summary",
+            "rationale": "Issue rationale",
+            "confidence_level": "medium",
+            "severity": "medium",
+            "payload": {
+                "issue_type": "editorial",
+                "impact": "Weak sequence.",
+                "mitigation": "Reframe the sequence.",
+            },
+        },
+        {
+            "entry_type": "task_recommendation",
+            "title": "Task",
+            "summary": "Task summary",
+            "rationale": "Task rationale",
+            "confidence_level": "medium",
+            "severity": "medium",
+            "payload": {
+                "task_type": "research",
+                "recommended_owner": "producer",
+                "acceptance_criteria": "Evidence gathered.",
+            },
+        },
+    ]
+    for payload in payloads:
+        await _create_entry(client, project_id, user_id, payload)
+
+    run = await client.post(
+        f"/api/v1/projects/{project_id}/deliberation-controller-runs",
+        json={"created_by_user_id": user_id},
+    )
+
+    assert run.status_code == 201
+    ranked_types = {item["entry_type"] for item in run.json()["ranked_candidates"]}
+    assert ranked_types == {
+        "proposal",
+        "contradiction",
+        "missing_information",
+        "issue",
+        "task_recommendation",
+    }

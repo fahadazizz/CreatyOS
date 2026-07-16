@@ -903,6 +903,17 @@ _ENTRY_PROOF_COST = {
     "task_recommendation": 3,
     "observation": 4,
 }
+DELIBERATION_SCORING_POLICY_VERSION = "deterministic_v1"
+REQUIRED_HUMAN_CHECKPOINT_TYPES = [
+    "project_thesis",
+    "creative_route",
+    "audience_promise",
+    "final_treatment",
+    "visual_language",
+    "production_plan",
+    "edit_direction",
+    "final_release",
+]
 
 
 def _priority_inputs_for_entry(
@@ -970,6 +981,7 @@ def _deliberation_candidate_read(
             "recommended_action": _recommended_action_for_entry(entry),
             "priority_inputs": priority_inputs,
             "priority_score": _priority_score(priority_inputs),
+            "scoring_policy_version": DELIBERATION_SCORING_POLICY_VERSION,
         }
     )
 
@@ -1007,7 +1019,8 @@ def run_deliberation_controller(
         ),
         result_json=json.dumps(
             {
-                "controller": "deterministic_v1",
+                "controller": DELIBERATION_SCORING_POLICY_VERSION,
+                "scoring_policy_version": DELIBERATION_SCORING_POLICY_VERSION,
                 "selected_blackboard_entry_id": str(selected.blackboard_entry_id),
                 "ranked_candidates": [
                     candidate.model_dump(mode="json") for candidate in ranked_candidates
@@ -1037,6 +1050,7 @@ def run_deliberation_controller(
     db.refresh(record)
     return schemas.DeliberationControllerRunRead(
         deliberation_record=_deliberation_record_read(record),
+        scoring_policy_version=DELIBERATION_SCORING_POLICY_VERSION,
         selected_candidate=selected,
         ranked_candidates=ranked_candidates,
     )
@@ -1325,6 +1339,63 @@ def list_project_human_checkpoints(
     return [_human_checkpoint_read(checkpoint) for checkpoint in db.scalars(query).all()]
 
 
+def get_project_human_checkpoint_readiness(
+    db: Session, project_id: str
+) -> schemas.HumanCheckpointReadinessRead:
+    project = _one(db, models.Project, project_id)
+    checkpoints = db.scalars(
+        select(models.HumanCheckpoint)
+        .where(models.HumanCheckpoint.project_id == project.id)
+        .order_by(models.HumanCheckpoint.created_at)
+    ).all()
+
+    latest_by_type: dict[str, models.HumanCheckpoint] = {}
+    for checkpoint in checkpoints:
+        latest_by_type[checkpoint.checkpoint_type] = checkpoint
+
+    items = []
+    approved = []
+    missing = []
+    blocked = []
+    revision_requested = []
+    for checkpoint_type in REQUIRED_HUMAN_CHECKPOINT_TYPES:
+        checkpoint = latest_by_type.get(checkpoint_type)
+        if checkpoint is None:
+            missing.append(checkpoint_type)
+            items.append(
+                schemas.HumanCheckpointReadinessItem(
+                    checkpoint_type=checkpoint_type,
+                    status="missing",
+                )
+            )
+            continue
+        status = checkpoint.decision_status
+        if status == "approved":
+            approved.append(checkpoint_type)
+        elif status == "blocked":
+            blocked.append(checkpoint_type)
+        elif status == "revision_requested":
+            revision_requested.append(checkpoint_type)
+        items.append(
+            schemas.HumanCheckpointReadinessItem(
+                checkpoint_type=checkpoint_type,
+                status=status,
+                checkpoint_id=checkpoint.id,
+            )
+        )
+
+    return schemas.HumanCheckpointReadinessRead(
+        project_id=project.id,
+        ready=not missing and len(approved) == len(REQUIRED_HUMAN_CHECKPOINT_TYPES),
+        required_checkpoint_types=REQUIRED_HUMAN_CHECKPOINT_TYPES,
+        approved_checkpoint_types=approved,
+        missing_checkpoint_types=missing,
+        blocked_checkpoint_types=blocked,
+        revision_requested_checkpoint_types=revision_requested,
+        items=items,
+    )
+
+
 def get_human_checkpoint(db: Session, checkpoint_id: str) -> schemas.HumanCheckpointRead:
     return _human_checkpoint_read(_one(db, models.HumanCheckpoint, checkpoint_id))
 
@@ -1334,6 +1405,8 @@ def decide_human_checkpoint(
 ) -> schemas.HumanCheckpointRead:
     checkpoint = _one(db, models.HumanCheckpoint, checkpoint_id)
     _one(db, models.User, str(data.decided_by_user_id))
+    if checkpoint.decision_status != "pending":
+        raise ConflictError("human checkpoint has already been decided; create a new checkpoint")
     old_status = checkpoint.decision_status
     checkpoint.decided_by_user_id = str(data.decided_by_user_id)
     checkpoint.decision_status = data.decision_status

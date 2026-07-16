@@ -166,6 +166,43 @@ async def test_human_checkpoint_decision_requires_rationale(client: httpx.AsyncC
 
 
 @pytest.mark.anyio
+async def test_human_checkpoint_decision_cannot_be_overwritten(
+    client: httpx.AsyncClient,
+) -> None:
+    project_id, user_id = await _project_context(client)
+    created = await client.post(
+        f"/api/v1/projects/{project_id}/human-checkpoints",
+        json={
+            "requested_by_user_id": user_id,
+            "checkpoint_type": "creative_route",
+            "title": "Approve route",
+            "summary": "The route needs one accountable decision.",
+        },
+    )
+    assert created.status_code == 201
+    first = await client.patch(
+        f"/api/v1/human-checkpoints/{created.json()['id']}/decision",
+        json={
+            "decided_by_user_id": user_id,
+            "decision_status": "approved",
+            "decision_rationale": "Route is proven enough.",
+        },
+    )
+    assert first.status_code == 200
+
+    second = await client.patch(
+        f"/api/v1/human-checkpoints/{created.json()['id']}/decision",
+        json={
+            "decided_by_user_id": user_id,
+            "decision_status": "blocked",
+            "decision_rationale": "Trying to overwrite.",
+        },
+    )
+
+    assert second.status_code == 409
+
+
+@pytest.mark.anyio
 async def test_human_checkpoint_rejects_cross_project_links(client: httpx.AsyncClient) -> None:
     project_a_id, user_a_id = await _project_context(client, "a")
     project_b_id, user_b_id = await _project_context(client, "b")
@@ -216,3 +253,50 @@ async def test_human_checkpoint_does_not_mutate_source_of_truth(
     assert artifacts.json() == []
     assert decisions.json() == []
     assert creative_inputs.json() == []
+
+
+@pytest.mark.anyio
+async def test_human_checkpoint_readiness_requires_all_approved_types(
+    client: httpx.AsyncClient,
+) -> None:
+    project_id, user_id = await _project_context(client)
+
+    initial = await client.get(f"/api/v1/projects/{project_id}/human-checkpoints/readiness")
+    assert initial.status_code == 200
+    assert initial.json()["ready"] is False
+    assert set(initial.json()["missing_checkpoint_types"]) == {
+        "project_thesis",
+        "creative_route",
+        "audience_promise",
+        "final_treatment",
+        "visual_language",
+        "production_plan",
+        "edit_direction",
+        "final_release",
+    }
+
+    for checkpoint_type in initial.json()["required_checkpoint_types"]:
+        created = await client.post(
+            f"/api/v1/projects/{project_id}/human-checkpoints",
+            json={
+                "requested_by_user_id": user_id,
+                "checkpoint_type": checkpoint_type,
+                "title": f"Approve {checkpoint_type}",
+                "summary": "Required checkpoint.",
+            },
+        )
+        assert created.status_code == 201
+        decided = await client.patch(
+            f"/api/v1/human-checkpoints/{created.json()['id']}/decision",
+            json={
+                "decided_by_user_id": user_id,
+                "decision_status": "approved",
+                "decision_rationale": "Approved for readiness.",
+            },
+        )
+        assert decided.status_code == 200
+
+    final = await client.get(f"/api/v1/projects/{project_id}/human-checkpoints/readiness")
+    assert final.status_code == 200
+    assert final.json()["ready"] is True
+    assert final.json()["missing_checkpoint_types"] == []

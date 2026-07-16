@@ -549,10 +549,12 @@ class DeliberationCandidateRead(BaseModel):
     recommended_action: str
     priority_inputs: DeliberationPriorityInputs
     priority_score: float
+    scoring_policy_version: str
 
 
 class DeliberationControllerRunRead(BaseModel):
     deliberation_record: DeliberationRecordRead
+    scoring_policy_version: str
     selected_candidate: DeliberationCandidateRead
     ranked_candidates: list[DeliberationCandidateRead]
 
@@ -660,3 +662,20 @@ class HumanCheckpointRead(OrmModel):
     target_creative_input_id: UUID | None
     created_at: datetime
     updated_at: datetime
+
+
+class HumanCheckpointReadinessItem(BaseModel):
+    checkpoint_type: HumanCheckpointType
+    status: HumanCheckpointStatus | Literal["missing"]
+    checkpoint_id: UUID | None = None
+
+
+class HumanCheckpointReadinessRead(BaseModel):
+    project_id: UUID
+    ready: bool
+    required_checkpoint_types: list[HumanCheckpointType]
+    approved_checkpoint_types: list[HumanCheckpointType]
+    missing_checkpoint_types: list[HumanCheckpointType]
+    blocked_checkpoint_types: list[HumanCheckpointType]
+    revision_requested_checkpoint_types: list[HumanCheckpointType]
+    items: list[HumanCheckpointReadinessItem]

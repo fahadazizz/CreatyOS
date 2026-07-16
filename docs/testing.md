@@ -87,6 +87,8 @@ Phase 2.3 deliberation controller tests verify deterministic ranking, recorded d
 
 Phase 2.4 human checkpoint tests verify checkpoint creation/decision audit, rationale validation, cross-project link rejection, and no source-of-truth mutation.
 
+Milestone 2 hardening tests verify controller scoring policy exposure, all-entry-type scoring, single-decision checkpoints, all-checkpoint readiness, and DB state constraints through migration verification.
+
 Run Alembic migrations:
 
 ```bash

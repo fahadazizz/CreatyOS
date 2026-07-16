@@ -428,6 +428,19 @@ async def list_project_human_checkpoints(
         _handle_error(exc)
 
 
+@router.get(
+    "/projects/{project_id}/human-checkpoints/readiness",
+    response_model=schemas.HumanCheckpointReadinessRead,
+)
+async def get_project_human_checkpoint_readiness(
+    project_id: UUID, db: Session = Depends(get_db)
+):
+    try:
+        return services.get_project_human_checkpoint_readiness(db, str(project_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
 @router.get("/human-checkpoints/{checkpoint_id}", response_model=schemas.HumanCheckpointRead)
 async def get_human_checkpoint(checkpoint_id: UUID, db: Session = Depends(get_db)):
     try:
