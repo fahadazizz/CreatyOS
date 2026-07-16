@@ -27,3 +27,30 @@ Before writing Milestone 1 code:
 - preserve source-of-truth boundaries from the product doctrine;
 - include tests unless technically impossible;
 - run checks in the order defined by `docs/testing.md`.
+
+## Backend Development
+
+Install dependencies:
+
+```bash
+python -m pip install -e ".[test]"
+```
+
+Run the API locally:
+
+```bash
+PYTHONPATH=backend uvicorn app.main:app --reload
+```
+
+Run migrations from the backend directory:
+
+```bash
+cd backend
+PYTHONPATH=. alembic upgrade head
+```
+
+Run backend tests:
+
+```bash
+PYTHONPATH=backend python -m pytest backend/tests
+```

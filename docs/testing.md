@@ -27,6 +27,27 @@ When software implementation begins, run checks in this order when relevant:
 
 If a check is missing or technically impossible, document the gap in the final response and in the relevant milestone or runbook update.
 
+## Milestone 1 Backend Checks
+
+Install test dependencies before running backend tests:
+
+```bash
+python -m pip install -e ".[test]"
+```
+
+Run Phase 1 backend unit/API tests:
+
+```bash
+PYTHONPATH=backend python -m pytest backend/tests
+```
+
+Run Alembic migrations:
+
+```bash
+cd backend
+PYTHONPATH=. alembic upgrade head
+```
+
 ## Anti-Slop Test Expectations
 
 Future implementation tests should include boundary cases for:
