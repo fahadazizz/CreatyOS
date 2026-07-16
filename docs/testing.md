@@ -27,6 +27,61 @@ When software implementation begins, run checks in this order when relevant:
 
 If a check is missing or technically impossible, document the gap in the final response and in the relevant milestone or runbook update.
 
+## Milestone 1 Backend Checks
+
+Install test dependencies before running backend tests:
+
+```bash
+python -m pip install -e ".[test]"
+```
+
+Run Phase 1 backend unit/API tests:
+
+```bash
+PYTHONPATH=backend python -m pytest backend/tests
+```
+
+Phase 1.2 artifact/version tests verify:
+
+- artifact type validation;
+- script is not a Living Film Model artifact type;
+- artifact-type-specific version body validation;
+- schema version compatibility with artifact type;
+- unknown artifact body fields are rejected;
+- append-only version numbering;
+- prior versions remain readable;
+- artifact and artifact version audit events.
+
+Phase 1.3 decision log tests verify:
+
+- decision creation, listing, and fetch;
+- selected option must be one of the alternatives considered;
+- status changes produce audit events;
+- artifact versions can link only to existing decisions;
+- linked decisions must be project-compatible.
+
+Phase 1.4 creative input tests verify:
+
+- script can be stored as candidate input;
+- script still cannot be a Living Film Model artifact type;
+- creative input creation does not create artifacts;
+- creative input list/get/filter behavior;
+- non-empty body validation;
+- creative input audit events.
+
+Run Alembic migrations:
+
+```bash
+cd backend
+PYTHONPATH=. alembic upgrade head
+```
+
+Run full repository verification:
+
+```bash
+scripts/verify.sh
+```
+
 ## Anti-Slop Test Expectations
 
 Future implementation tests should include boundary cases for:

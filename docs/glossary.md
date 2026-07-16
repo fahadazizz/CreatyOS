@@ -36,7 +36,11 @@ The system that records what changed, why it changed, whether the work improved,
 
 ## Script
 
-An input artifact. It may contain narration, dialogue, claims, structure, or intent, but it is not creative source of truth or timeline truth.
+Input material. It may contain narration, dialogue, claims, structure, or intent, but it is not creative source of truth or timeline truth.
+
+## Creative Input
+
+A candidate-only project input such as a raw brief, script, research note, reference, constraint, audience note, deliverable note, or example. It does not mutate Living Film Model truth.
 
 ## Timeline
 
