@@ -14,3 +14,4 @@
 - `POST/GET /api/v1/score-branches/{branch_id}/preview-prototypes`; `GET /api/v1/score-preview-prototypes/{prototype_id}`.
 - `POST/GET /api/v1/score-preview-prototypes/{prototype_id}/items`; `GET /api/v1/score-preview-items/{preview_item_id}`.
 - Preview items require a same-branch score event, non-empty inspection fields, and type-specific body keys; preview records do not create render, asset, or NLE outputs.
+- `GET /api/v1/score-preview-prototypes/{prototype_id}/coverage` reports whether every score event in the branch has preview coverage.

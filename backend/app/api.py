@@ -740,3 +740,14 @@ async def get_score_preview_item(preview_item_id: UUID, db: Session = Depends(ge
         return services.get_score_preview_item(db, str(preview_item_id))
     except Exception as exc:
         _handle_error(exc)
+
+
+@router.get(
+    "/score-preview-prototypes/{prototype_id}/coverage",
+    response_model=schemas.AudiovisualScorePreviewCoverageRead,
+)
+async def get_score_preview_coverage(prototype_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.get_score_preview_coverage(db, str(prototype_id))
+    except Exception as exc:
+        _handle_error(exc)

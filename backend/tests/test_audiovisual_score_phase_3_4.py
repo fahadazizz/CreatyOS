@@ -100,6 +100,32 @@ async def _create_score_event(
     return response.json()
 
 
+async def _create_second_score_event(
+    client: httpx.AsyncClient, branch_id: str, user_id: str
+) -> dict[str, object]:
+    response = await client.post(
+        f"/api/v1/score-branches/{branch_id}/events",
+        json={
+            "created_by_user_id": user_id,
+            "hierarchy_level": "beat",
+            "title": "Reaction pause",
+            "sort_key": "002",
+            "why": "Test whether the viewer has enough time to absorb the reveal.",
+            "what": "The sequence pauses on the consequence before moving forward.",
+            "how": "Use a held card and restrained timing note.",
+            "where_when": {
+                "placement": "Immediately after the pressure reveal.",
+                "timing": "Before the argument continues.",
+                "duration": "Elastic until screening clarifies rhythm.",
+                "dependency": "Requires the pressure reveal beat.",
+            },
+            "duration_policy": "elastic",
+        },
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
 async def _create_prototype(
     client: httpx.AsyncClient, branch_id: str, user_id: str
 ) -> dict[str, object]:
@@ -300,3 +326,43 @@ async def test_preview_foundation_does_not_create_execution_outputs(
     assert artifacts.json() == []
     assert decisions.json() == []
     assert creative_inputs.json() == []
+
+
+@pytest.mark.anyio
+async def test_preview_coverage_reports_missing_and_ready_events(
+    client: httpx.AsyncClient,
+) -> None:
+    project_id, user_id = await _project_context(client)
+    branch = await _create_branch(client, project_id, user_id)
+    first_event = await _create_score_event(client, branch["id"], user_id)
+    second_event = await _create_second_score_event(client, branch["id"], user_id)
+    prototype = await _create_prototype(client, branch["id"], user_id)
+
+    first_item = await client.post(
+        f"/api/v1/score-preview-prototypes/{prototype['id']}/items",
+        json=_preview_item_payload(user_id, first_event["id"]),
+    )
+    assert first_item.status_code == 201
+
+    incomplete = await client.get(f"/api/v1/score-preview-prototypes/{prototype['id']}/coverage")
+    assert incomplete.status_code == 200
+    incomplete_body = incomplete.json()
+    assert incomplete_body["ready"] is False
+    assert incomplete_body["total_score_events"] == 2
+    assert incomplete_body["covered_score_events"] == 1
+    assert incomplete_body["missing_score_event_ids"] == [second_event["id"]]
+
+    second_item = await client.post(
+        f"/api/v1/score-preview-prototypes/{prototype['id']}/items",
+        json=_preview_item_payload(user_id, second_event["id"], sort_key="002"),
+    )
+    assert second_item.status_code == 201
+
+    complete = await client.get(f"/api/v1/score-preview-prototypes/{prototype['id']}/coverage")
+    complete_body = complete.json()
+    assert complete_body["ready"] is True
+    assert complete_body["missing_score_event_ids"] == []
+    assert [event["covered"] for event in complete_body["events"]] == [True, True]
+    assert complete_body["events"][0]["why"] == (
+        "Test whether the viewer feels pressure before explanation."
+    )

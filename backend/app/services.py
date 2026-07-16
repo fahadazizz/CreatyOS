@@ -2102,3 +2102,51 @@ def get_score_preview_item(
     db: Session, preview_item_id: str
 ) -> schemas.AudiovisualScorePreviewItemRead:
     return _score_preview_item_read(_one(db, models.AudiovisualScorePreviewItem, preview_item_id))
+
+
+def get_score_preview_coverage(
+    db: Session, prototype_id: str
+) -> schemas.AudiovisualScorePreviewCoverageRead:
+    prototype = _one(db, models.AudiovisualScorePreviewPrototype, prototype_id)
+    score_events = db.scalars(
+        select(models.AudiovisualScoreEvent)
+        .where(models.AudiovisualScoreEvent.branch_id == prototype.branch_id)
+        .order_by(models.AudiovisualScoreEvent.sort_key)
+    ).all()
+    preview_items = db.scalars(
+        select(models.AudiovisualScorePreviewItem).where(
+            models.AudiovisualScorePreviewItem.prototype_id == prototype.id
+        )
+    ).all()
+    item_counts: dict[str, int] = {}
+    for item in preview_items:
+        item_counts[item.score_event_id] = item_counts.get(item.score_event_id, 0) + 1
+
+    events = []
+    missing_score_event_ids = []
+    for score_event in score_events:
+        item_count = item_counts.get(score_event.id, 0)
+        covered = item_count > 0
+        if not covered:
+            missing_score_event_ids.append(score_event.id)
+        events.append(
+            schemas.AudiovisualScorePreviewCoverageEventRead(
+                score_event_id=score_event.id,
+                title=score_event.title,
+                sort_key=score_event.sort_key,
+                why=score_event.why,
+                preview_item_count=item_count,
+                covered=covered,
+            )
+        )
+
+    return schemas.AudiovisualScorePreviewCoverageRead(
+        prototype_id=prototype.id,
+        branch_id=prototype.branch_id,
+        project_id=prototype.project_id,
+        ready=bool(score_events) and not missing_score_event_ids,
+        total_score_events=len(score_events),
+        covered_score_events=len(score_events) - len(missing_score_event_ids),
+        missing_score_event_ids=missing_score_event_ids,
+        events=events,
+    )

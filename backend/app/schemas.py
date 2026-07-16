@@ -1010,3 +1010,23 @@ class AudiovisualScorePreviewItemRead(OrmModel):
     linked_blackboard_entry_id: UUID | None
     created_at: datetime
     updated_at: datetime
+
+
+class AudiovisualScorePreviewCoverageEventRead(BaseModel):
+    score_event_id: UUID
+    title: str
+    sort_key: str
+    why: str
+    preview_item_count: int
+    covered: bool
+
+
+class AudiovisualScorePreviewCoverageRead(BaseModel):
+    prototype_id: UUID
+    branch_id: UUID
+    project_id: UUID
+    ready: bool
+    total_score_events: int
+    covered_score_events: int
+    missing_score_event_ids: list[UUID]
+    events: list[AudiovisualScorePreviewCoverageEventRead]
