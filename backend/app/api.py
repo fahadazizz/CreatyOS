@@ -237,3 +237,228 @@ async def get_creative_input(creative_input_id: UUID, db: Session = Depends(get_
         return services.get_creative_input(db, str(creative_input_id))
     except Exception as exc:
         _handle_error(exc)
+
+
+@router.post(
+    "/projects/{project_id}/blackboard-entries",
+    response_model=schemas.BlackboardEntryRead,
+    status_code=201,
+)
+async def create_blackboard_entry(
+    project_id: UUID, payload: schemas.BlackboardEntryCreate, db: Session = Depends(get_db)
+):
+    try:
+        return services.create_blackboard_entry(db, str(project_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/projects/{project_id}/blackboard-entries",
+    response_model=list[schemas.BlackboardEntryRead],
+)
+async def list_project_blackboard_entries(
+    project_id: UUID,
+    entry_type: schemas.BlackboardEntryType | None = Query(default=None),
+    status: schemas.BlackboardEntryStatus | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.list_project_blackboard_entries(
+            db, str(project_id), entry_type=entry_type, status=status
+        )
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get("/blackboard-entries/{entry_id}", response_model=schemas.BlackboardEntryRead)
+async def get_blackboard_entry(entry_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.get_blackboard_entry(db, str(entry_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.patch(
+    "/blackboard-entries/{entry_id}/status",
+    response_model=schemas.BlackboardEntryRead,
+)
+async def update_blackboard_entry_status(
+    entry_id: UUID,
+    payload: schemas.BlackboardEntryStatusUpdate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.update_blackboard_entry_status(db, str(entry_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.post(
+    "/projects/{project_id}/deliberations",
+    response_model=schemas.DeliberationRecordRead,
+    status_code=201,
+)
+async def create_deliberation_record(
+    project_id: UUID,
+    payload: schemas.DeliberationRecordCreate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.create_deliberation_record(db, str(project_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.post(
+    "/projects/{project_id}/deliberation-controller-runs",
+    response_model=schemas.DeliberationControllerRunRead,
+    status_code=201,
+)
+async def run_deliberation_controller(
+    project_id: UUID,
+    payload: schemas.DeliberationControllerRunCreate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.run_deliberation_controller(db, str(project_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/projects/{project_id}/deliberations",
+    response_model=list[schemas.DeliberationRecordRead],
+)
+async def list_project_deliberation_records(
+    project_id: UUID, db: Session = Depends(get_db)
+):
+    try:
+        return services.list_project_deliberation_records(db, str(project_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get("/deliberations/{deliberation_id}", response_model=schemas.DeliberationRecordRead)
+async def get_deliberation_record(deliberation_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.get_deliberation_record(db, str(deliberation_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.post(
+    "/projects/{project_id}/specialist-proposals",
+    response_model=schemas.SpecialistProposalRead,
+    status_code=201,
+)
+async def create_specialist_proposal(
+    project_id: UUID,
+    payload: schemas.SpecialistProposalCreate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.create_specialist_proposal(db, str(project_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/projects/{project_id}/specialist-proposals",
+    response_model=list[schemas.SpecialistProposalRead],
+)
+async def list_project_specialist_proposals(
+    project_id: UUID,
+    specialist_type: schemas.SpecialistType | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.list_project_specialist_proposals(
+            db, str(project_id), specialist_type=specialist_type
+        )
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/specialist-proposals/{proposal_id}",
+    response_model=schemas.SpecialistProposalRead,
+)
+async def get_specialist_proposal(proposal_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.get_specialist_proposal(db, str(proposal_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.post(
+    "/projects/{project_id}/human-checkpoints",
+    response_model=schemas.HumanCheckpointRead,
+    status_code=201,
+)
+async def create_human_checkpoint(
+    project_id: UUID,
+    payload: schemas.HumanCheckpointCreate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.create_human_checkpoint(db, str(project_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/projects/{project_id}/human-checkpoints",
+    response_model=list[schemas.HumanCheckpointRead],
+)
+async def list_project_human_checkpoints(
+    project_id: UUID,
+    checkpoint_type: schemas.HumanCheckpointType | None = Query(default=None),
+    decision_status: schemas.HumanCheckpointStatus | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.list_project_human_checkpoints(
+            db,
+            str(project_id),
+            checkpoint_type=checkpoint_type,
+            decision_status=decision_status,
+        )
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/projects/{project_id}/human-checkpoints/readiness",
+    response_model=schemas.HumanCheckpointReadinessRead,
+)
+async def get_project_human_checkpoint_readiness(
+    project_id: UUID, db: Session = Depends(get_db)
+):
+    try:
+        return services.get_project_human_checkpoint_readiness(db, str(project_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get("/human-checkpoints/{checkpoint_id}", response_model=schemas.HumanCheckpointRead)
+async def get_human_checkpoint(checkpoint_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.get_human_checkpoint(db, str(checkpoint_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.patch(
+    "/human-checkpoints/{checkpoint_id}/decision",
+    response_model=schemas.HumanCheckpointRead,
+)
+async def decide_human_checkpoint(
+    checkpoint_id: UUID,
+    payload: schemas.HumanCheckpointDecisionUpdate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.decide_human_checkpoint(db, str(checkpoint_id), payload)
+    except Exception as exc:
+        _handle_error(exc)

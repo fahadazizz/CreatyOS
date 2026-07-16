@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class OrmModel(BaseModel):
@@ -14,6 +14,20 @@ def _strip_nonempty(value: str) -> str:
     if not stripped:
         raise ValueError("must not be empty")
     return stripped
+
+
+def _require_payload_keys(
+    payload: dict[str, Any], entry_type: str, required_keys: tuple[str, ...]
+) -> None:
+    missing = [
+        key
+        for key in required_keys
+        if key not in payload or payload[key] is None or payload[key] == ""
+    ]
+    if missing:
+        raise ValueError(
+            f"{entry_type} payload requires: {', '.join(required_keys)}"
+        )
 
 
 class WorkspaceCreate(BaseModel):
@@ -338,3 +352,330 @@ class CreativeInputRead(OrmModel):
     candidate_state: CandidateState
     body: dict[str, Any]
     created_at: datetime
+
+
+BlackboardEntryType = Literal[
+    "observation",
+    "proposal",
+    "contradiction",
+    "missing_information",
+    "risk",
+    "issue",
+    "proof_request",
+    "task_recommendation",
+]
+BlackboardEntryStatus = Literal["open", "accepted", "rejected", "resolved", "superseded"]
+BlackboardSeverity = Literal["low", "medium", "high", "critical"]
+DeliberationPhase = Literal[
+    "sense",
+    "frame",
+    "diverge",
+    "externalize",
+    "experience",
+    "critique",
+    "decide",
+    "commit",
+    "propagate",
+    "reopen",
+]
+DeliberationStatus = Literal["open", "recorded", "superseded"]
+SpecialistType = Literal[
+    "creative_director",
+    "story_argument",
+    "editorial",
+    "visual_direction",
+    "sound_direction",
+    "producer",
+    "critic",
+]
+SpecialistProposalKind = Literal[
+    "creative_route",
+    "story_argument",
+    "editorial_action",
+    "visual_direction",
+    "sound_direction",
+    "production_action",
+    "critique",
+    "proof_request",
+    "risk_response",
+]
+SpecialistProposalStatus = Literal["submitted"]
+HumanCheckpointType = Literal[
+    "project_thesis",
+    "creative_route",
+    "audience_promise",
+    "final_treatment",
+    "visual_language",
+    "production_plan",
+    "edit_direction",
+    "final_release",
+]
+HumanCheckpointStatus = Literal["pending", "approved", "revision_requested", "blocked"]
+
+
+BLACKBOARD_PAYLOAD_REQUIREMENTS: dict[BlackboardEntryType, tuple[str, ...]] = {
+    "observation": ("observation", "evidence"),
+    "proposal": ("proposal_type", "recommended_action", "expected_impact"),
+    "contradiction": ("contradiction", "conflicts_with"),
+    "missing_information": ("question", "needed_for"),
+    "risk": ("risk_type", "impact", "mitigation"),
+    "issue": ("issue_type", "impact", "mitigation"),
+    "proof_request": (
+        "proof_type",
+        "question",
+        "acceptance_test",
+        "cheapest_useful_proof",
+    ),
+    "task_recommendation": (
+        "task_type",
+        "recommended_owner",
+        "acceptance_criteria",
+    ),
+}
+
+
+class BlackboardEntryCreate(BaseModel):
+    author_user_id: UUID
+    entry_type: BlackboardEntryType
+    title: str = Field(min_length=1, max_length=240)
+    summary: str = Field(min_length=1, max_length=4000)
+    rationale: str = Field(min_length=1, max_length=4000)
+    confidence_level: ConfidenceLevel
+    severity: BlackboardSeverity
+    payload: dict[str, Any]
+    target_artifact_id: UUID | None = None
+    target_artifact_version_id: UUID | None = None
+    target_decision_id: UUID | None = None
+    target_creative_input_id: UUID | None = None
+
+    _title = field_validator("title")(_strip_nonempty)
+    _summary = field_validator("summary")(_strip_nonempty)
+    _rationale = field_validator("rationale")(_strip_nonempty)
+
+    @model_validator(mode="after")
+    def validate_structured_payload(self) -> "BlackboardEntryCreate":
+        if not self.payload:
+            raise ValueError("payload must not be empty")
+        _require_payload_keys(
+            self.payload,
+            self.entry_type,
+            BLACKBOARD_PAYLOAD_REQUIREMENTS[self.entry_type],
+        )
+        return self
+
+
+class BlackboardEntryRead(OrmModel):
+    id: UUID
+    project_id: UUID
+    author_user_id: UUID
+    entry_type: str
+    title: str
+    summary: str
+    rationale: str
+    confidence_level: str
+    severity: str
+    status: str
+    payload: dict[str, Any]
+    target_artifact_id: UUID | None
+    target_artifact_version_id: UUID | None
+    target_decision_id: UUID | None
+    target_creative_input_id: UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class BlackboardEntryStatusUpdate(BaseModel):
+    status: BlackboardEntryStatus
+
+
+class DeliberationPriorityInputs(BaseModel):
+    creative_impact: int = Field(ge=1, le=5)
+    uncertainty: int = Field(ge=1, le=5)
+    irreversibility: int = Field(ge=1, le=5)
+    cost_of_delay: int = Field(ge=1, le=5)
+    proof_cost: int = Field(ge=1, le=5)
+    dependency_blockage: int = Field(ge=1, le=5)
+
+
+class DeliberationRecordCreate(BaseModel):
+    created_by_user_id: UUID
+    phase: DeliberationPhase
+    question: str = Field(min_length=1, max_length=4000)
+    priority_inputs: DeliberationPriorityInputs
+    linked_entry_ids: list[UUID] = Field(default_factory=list, max_length=100)
+    recommended_next_action: str = Field(min_length=1, max_length=4000)
+    rationale: str = Field(min_length=1, max_length=4000)
+    result: dict[str, Any] = Field(default_factory=dict)
+
+    _question = field_validator("question")(_strip_nonempty)
+    _recommended_next_action = field_validator("recommended_next_action")(_strip_nonempty)
+    _rationale = field_validator("rationale")(_strip_nonempty)
+
+    @field_validator("linked_entry_ids")
+    @classmethod
+    def validate_linked_entry_ids(cls, value: list[UUID]) -> list[UUID]:
+        if len(set(value)) != len(value):
+            raise ValueError("linked_entry_ids must not contain duplicates")
+        return value
+
+
+class DeliberationRecordRead(OrmModel):
+    id: UUID
+    project_id: UUID
+    created_by_user_id: UUID
+    phase: str
+    question: str
+    priority_inputs: DeliberationPriorityInputs
+    linked_entry_ids: list[UUID]
+    recommended_next_action: str
+    rationale: str
+    result: dict[str, Any]
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class DeliberationControllerRunCreate(BaseModel):
+    created_by_user_id: UUID
+    question: str = Field(default="What is the next most useful creative action?", max_length=4000)
+
+    _question = field_validator("question")(_strip_nonempty)
+
+
+class DeliberationCandidateRead(BaseModel):
+    blackboard_entry_id: UUID
+    entry_type: str
+    title: str
+    recommended_action: str
+    priority_inputs: DeliberationPriorityInputs
+    priority_score: float
+    scoring_policy_version: str
+
+
+class DeliberationControllerRunRead(BaseModel):
+    deliberation_record: DeliberationRecordRead
+    scoring_policy_version: str
+    selected_candidate: DeliberationCandidateRead
+    ranked_candidates: list[DeliberationCandidateRead]
+
+
+class SpecialistProposalCreate(BaseModel):
+    submitted_by_user_id: UUID
+    specialist_type: SpecialistType
+    proposal_kind: SpecialistProposalKind
+    title: str = Field(min_length=1, max_length=240)
+    problem_statement: str = Field(min_length=1, max_length=4000)
+    recommendation: str = Field(min_length=1, max_length=4000)
+    rationale: str = Field(min_length=1, max_length=4000)
+    expected_impact: str = Field(min_length=1, max_length=4000)
+    confidence_level: ConfidenceLevel
+    severity: BlackboardSeverity
+    evidence: list[str] = Field(default_factory=list, max_length=100)
+    risks: list[str] = Field(default_factory=list, max_length=100)
+    target_artifact_id: UUID | None = None
+    target_artifact_version_id: UUID | None = None
+    target_decision_id: UUID | None = None
+    target_creative_input_id: UUID | None = None
+
+    _title = field_validator("title")(_strip_nonempty)
+    _problem_statement = field_validator("problem_statement")(_strip_nonempty)
+    _recommendation = field_validator("recommendation")(_strip_nonempty)
+    _rationale = field_validator("rationale")(_strip_nonempty)
+    _expected_impact = field_validator("expected_impact")(_strip_nonempty)
+
+    @field_validator("evidence", "risks")
+    @classmethod
+    def validate_string_items(cls, value: list[str]) -> list[str]:
+        cleaned = []
+        for item in value:
+            stripped = item.strip()
+            if not stripped:
+                raise ValueError("list items must not be empty")
+            cleaned.append(stripped)
+        return cleaned
+
+
+class SpecialistProposalRead(OrmModel):
+    id: UUID
+    project_id: UUID
+    submitted_by_user_id: UUID
+    blackboard_entry_id: UUID
+    specialist_type: str
+    proposal_kind: str
+    title: str
+    problem_statement: str
+    recommendation: str
+    rationale: str
+    expected_impact: str
+    confidence_level: str
+    severity: str
+    evidence: list[str]
+    risks: list[str]
+    status: str
+    target_artifact_id: UUID | None
+    target_artifact_version_id: UUID | None
+    target_decision_id: UUID | None
+    target_creative_input_id: UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class HumanCheckpointCreate(BaseModel):
+    requested_by_user_id: UUID
+    checkpoint_type: HumanCheckpointType
+    title: str = Field(min_length=1, max_length=240)
+    summary: str = Field(min_length=1, max_length=4000)
+    linked_blackboard_entry_id: UUID | None = None
+    linked_deliberation_record_id: UUID | None = None
+    target_artifact_id: UUID | None = None
+    target_artifact_version_id: UUID | None = None
+    target_decision_id: UUID | None = None
+    target_creative_input_id: UUID | None = None
+
+    _title = field_validator("title")(_strip_nonempty)
+    _summary = field_validator("summary")(_strip_nonempty)
+
+
+class HumanCheckpointDecisionUpdate(BaseModel):
+    decided_by_user_id: UUID
+    decision_status: Literal["approved", "revision_requested", "blocked"]
+    decision_rationale: str = Field(min_length=1, max_length=4000)
+
+    _decision_rationale = field_validator("decision_rationale")(_strip_nonempty)
+
+
+class HumanCheckpointRead(OrmModel):
+    id: UUID
+    project_id: UUID
+    requested_by_user_id: UUID
+    decided_by_user_id: UUID | None
+    checkpoint_type: str
+    title: str
+    summary: str
+    decision_status: str
+    decision_rationale: str | None
+    linked_blackboard_entry_id: UUID | None
+    linked_deliberation_record_id: UUID | None
+    target_artifact_id: UUID | None
+    target_artifact_version_id: UUID | None
+    target_decision_id: UUID | None
+    target_creative_input_id: UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class HumanCheckpointReadinessItem(BaseModel):
+    checkpoint_type: HumanCheckpointType
+    status: HumanCheckpointStatus | Literal["missing"]
+    checkpoint_id: UUID | None = None
+
+
+class HumanCheckpointReadinessRead(BaseModel):
+    project_id: UUID
+    ready: bool
+    required_checkpoint_types: list[HumanCheckpointType]
+    approved_checkpoint_types: list[HumanCheckpointType]
+    missing_checkpoint_types: list[HumanCheckpointType]
+    blocked_checkpoint_types: list[HumanCheckpointType]
+    revision_requested_checkpoint_types: list[HumanCheckpointType]
+    items: list[HumanCheckpointReadinessItem]

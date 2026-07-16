@@ -16,6 +16,7 @@
 - From Milestone 1 onward, default to production code first.
 - Write docs only when contracts, architecture, setup, commands, decisions, or behavior change.
 - Do not keep expanding docs while required code, tests, migrations, or APIs are missing.
+- keep changes minimal: prefer short changelog/status bullets over long explanations atmost 2-3 lines.
 
 ## 4. Milestone Execution
 - Strict chain: Milestone → Phase → Ticket → Contract → Implementation → Tests → Review.
