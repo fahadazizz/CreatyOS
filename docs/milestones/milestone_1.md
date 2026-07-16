@@ -69,9 +69,9 @@ Out of scope:
 
 ## Phase 1.2 - Typed Artifact and Version Model
 
-**Status:** not started
+**Status:** implemented
 
-### Planned Outputs
+### Outputs
 
 - Living Film Model artifact contracts for:
   - Creative Problem;
@@ -94,6 +94,8 @@ Out of scope:
 - Artifact versions are append-only.
 - Each artifact version records schema version, owner, confidence, linked decisions, linked evidence, and open questions where relevant.
 - Model/script inputs cannot become source of truth without explicit artifact version creation.
+- Script is not an artifact type.
+- Prior artifact versions remain readable after newer versions are appended.
 
 ## Phase 1.3 - Decision Log
 

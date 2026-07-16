@@ -19,6 +19,10 @@ class ConflictError(Exception):
     pass
 
 
+class ValidationError(Exception):
+    pass
+
+
 def _one(db: Session, model: type, resource_id: str):
     item = db.get(model, resource_id)
     if item is None:
@@ -48,6 +52,25 @@ def _audit(
     )
     db.add(event)
     return event
+
+
+def _artifact_version_read(version: models.ArtifactVersion) -> schemas.ArtifactVersionRead:
+    return schemas.ArtifactVersionRead.model_validate(
+        {
+            "id": version.id,
+            "artifact_id": version.artifact_id,
+            "version_number": version.version_number,
+            "schema_version": version.schema_version,
+            "author_user_id": version.author_user_id,
+            "parent_version_id": version.parent_version_id,
+            "confidence_level": version.confidence_level,
+            "body": json.loads(version.body_json),
+            "linked_decisions": json.loads(version.linked_decisions_json),
+            "linked_evidence": json.loads(version.linked_evidence_json),
+            "open_questions": json.loads(version.open_questions_json),
+            "created_at": version.created_at,
+        }
+    )
 
 
 def create_workspace(db: Session, data: schemas.WorkspaceCreate) -> models.Workspace:
@@ -225,3 +248,130 @@ def list_audit_events(db: Session, project_id: str | None = None) -> list[schema
         )
         for event in events
     ]
+
+
+def create_artifact(
+    db: Session, project_id: str, data: schemas.ArtifactCreate
+) -> models.Artifact:
+    project = _one(db, models.Project, project_id)
+    _one(db, models.User, str(data.owner_user_id))
+
+    production_id = str(data.production_id) if data.production_id else None
+    piece_id = str(data.piece_id) if data.piece_id else None
+
+    if production_id is not None:
+        production = _one(db, models.Production, production_id)
+        if production.project_id != project.id:
+            raise ValidationError("production does not belong to project")
+
+    if piece_id is not None:
+        piece = _one(db, models.Piece, piece_id)
+        production = _one(db, models.Production, piece.production_id)
+        if production.project_id != project.id:
+            raise ValidationError("piece does not belong to project")
+        if production_id is not None and piece.production_id != production_id:
+            raise ValidationError("piece does not belong to production")
+
+    artifact = models.Artifact(
+        project_id=project.id,
+        production_id=production_id,
+        piece_id=piece_id,
+        owner_user_id=str(data.owner_user_id),
+        artifact_type=data.artifact_type,
+        title=data.title,
+    )
+    db.add(artifact)
+    db.flush()
+    _audit(
+        db,
+        entity_type="artifact",
+        entity_id=artifact.id,
+        action="created",
+        actor_user_id=artifact.owner_user_id,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={"artifact_type": artifact.artifact_type, "title": artifact.title},
+    )
+    db.commit()
+    db.refresh(artifact)
+    return artifact
+
+
+def list_project_artifacts(db: Session, project_id: str) -> list[models.Artifact]:
+    _one(db, models.Project, project_id)
+    return list(
+        db.scalars(
+            select(models.Artifact)
+            .where(models.Artifact.project_id == project_id)
+            .order_by(models.Artifact.created_at)
+        ).all()
+    )
+
+
+def get_artifact(db: Session, artifact_id: str) -> models.Artifact:
+    return _one(db, models.Artifact, artifact_id)
+
+
+def create_artifact_version(
+    db: Session, artifact_id: str, data: schemas.ArtifactVersionCreate
+) -> schemas.ArtifactVersionRead:
+    artifact = _one(db, models.Artifact, artifact_id)
+    project = _one(db, models.Project, artifact.project_id)
+    _one(db, models.User, str(data.author_user_id))
+
+    parent_version_id = str(data.parent_version_id) if data.parent_version_id else None
+    if parent_version_id is not None:
+        parent = _one(db, models.ArtifactVersion, parent_version_id)
+        if parent.artifact_id != artifact.id:
+            raise ValidationError("parent version does not belong to artifact")
+
+    latest_number = db.scalar(
+        select(models.ArtifactVersion.version_number)
+        .where(models.ArtifactVersion.artifact_id == artifact.id)
+        .order_by(models.ArtifactVersion.version_number.desc())
+        .limit(1)
+    )
+    version_number = (latest_number or 0) + 1
+
+    version = models.ArtifactVersion(
+        artifact_id=artifact.id,
+        version_number=version_number,
+        schema_version=data.schema_version,
+        author_user_id=str(data.author_user_id),
+        parent_version_id=parent_version_id,
+        confidence_level=data.confidence_level,
+        body_json=json.dumps(data.body, sort_keys=True),
+        linked_decisions_json=json.dumps([str(item) for item in data.linked_decisions]),
+        linked_evidence_json=json.dumps(data.linked_evidence),
+        open_questions_json=json.dumps(data.open_questions),
+    )
+    db.add(version)
+    db.flush()
+    _audit(
+        db,
+        entity_type="artifact_version",
+        entity_id=version.id,
+        action="created",
+        actor_user_id=version.author_user_id,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={
+            "artifact_id": artifact.id,
+            "artifact_type": artifact.artifact_type,
+            "version_number": version.version_number,
+            "schema_version": version.schema_version,
+        },
+    )
+    db.commit()
+    db.refresh(version)
+    return _artifact_version_read(version)
+
+
+def list_artifact_versions(db: Session, artifact_id: str) -> list[schemas.ArtifactVersionRead]:
+    _one(db, models.Artifact, artifact_id)
+    versions = db.scalars(
+        select(models.ArtifactVersion)
+        .where(models.ArtifactVersion.artifact_id == artifact_id)
+        .order_by(models.ArtifactVersion.version_number)
+    ).all()
+    return [_artifact_version_read(version) for version in versions]

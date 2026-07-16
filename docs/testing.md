@@ -41,6 +41,15 @@ Run Phase 1 backend unit/API tests:
 PYTHONPATH=backend python -m pytest backend/tests
 ```
 
+Phase 1.2 artifact/version tests verify:
+
+- artifact type validation;
+- script is not a Living Film Model artifact type;
+- version body validation;
+- append-only version numbering;
+- prior versions remain readable;
+- artifact and artifact version audit events.
+
 Run Alembic migrations:
 
 ```bash

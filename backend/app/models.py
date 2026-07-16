@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -55,6 +55,7 @@ class Project(TimestampMixin, Base):
     workspace: Mapped[Workspace] = relationship(back_populates="projects")
     owner: Mapped[User] = relationship(back_populates="owned_projects")
     productions: Mapped[list["Production"]] = relationship(back_populates="project")
+    artifacts: Mapped[list["Artifact"]] = relationship(back_populates="project")
 
 
 class Production(TimestampMixin, Base):
@@ -110,3 +111,47 @@ class AuditEvent(Base):
     action: Mapped[str] = mapped_column(String(80), nullable=False)
     payload_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Artifact(TimestampMixin, Base):
+    __tablename__ = "artifacts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    production_id: Mapped[str | None] = mapped_column(
+        ForeignKey("productions.id"), nullable=True, index=True
+    )
+    piece_id: Mapped[str | None] = mapped_column(ForeignKey("pieces.id"), nullable=True, index=True)
+    owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    artifact_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(240), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="draft")
+
+    project: Mapped[Project] = relationship(back_populates="artifacts")
+    versions: Mapped[list["ArtifactVersion"]] = relationship(
+        back_populates="artifact", order_by="ArtifactVersion.version_number"
+    )
+
+
+class ArtifactVersion(Base):
+    __tablename__ = "artifact_versions"
+    __table_args__ = (
+        UniqueConstraint("artifact_id", "version_number", name="uq_artifact_versions_number"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    artifact_id: Mapped[str] = mapped_column(ForeignKey("artifacts.id"), nullable=False, index=True)
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    schema_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    author_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    parent_version_id: Mapped[str | None] = mapped_column(
+        ForeignKey("artifact_versions.id"), nullable=True, index=True
+    )
+    confidence_level: Mapped[str] = mapped_column(String(40), nullable=False)
+    body_json: Mapped[str] = mapped_column(Text, nullable=False)
+    linked_decisions_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    linked_evidence_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    open_questions_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    artifact: Mapped[Artifact] = relationship(back_populates="versions")

@@ -14,6 +14,8 @@ def _handle_error(exc: Exception) -> None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     if isinstance(exc, services.ConflictError):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    if isinstance(exc, services.ValidationError):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     raise exc
 
 
@@ -101,3 +103,58 @@ async def list_audit_events(
     project_id: UUID | None = Query(default=None), db: Session = Depends(get_db)
 ):
     return services.list_audit_events(db, str(project_id) if project_id else None)
+
+
+@router.post(
+    "/projects/{project_id}/artifacts",
+    response_model=schemas.ArtifactRead,
+    status_code=201,
+)
+async def create_artifact(
+    project_id: UUID, payload: schemas.ArtifactCreate, db: Session = Depends(get_db)
+):
+    try:
+        return services.create_artifact(db, str(project_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get("/projects/{project_id}/artifacts", response_model=list[schemas.ArtifactRead])
+async def list_project_artifacts(project_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.list_project_artifacts(db, str(project_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get("/artifacts/{artifact_id}", response_model=schemas.ArtifactRead)
+async def get_artifact(artifact_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.get_artifact(db, str(artifact_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.post(
+    "/artifacts/{artifact_id}/versions",
+    response_model=schemas.ArtifactVersionRead,
+    status_code=201,
+)
+async def create_artifact_version(
+    artifact_id: UUID, payload: schemas.ArtifactVersionCreate, db: Session = Depends(get_db)
+):
+    try:
+        return services.create_artifact_version(db, str(artifact_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/artifacts/{artifact_id}/versions",
+    response_model=list[schemas.ArtifactVersionRead],
+)
+async def list_artifact_versions(artifact_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.list_artifact_versions(db, str(artifact_id))
+    except Exception as exc:
+        _handle_error(exc)

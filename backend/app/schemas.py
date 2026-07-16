@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -139,4 +139,88 @@ class AuditEventRead(OrmModel):
     entity_id: UUID
     action: str
     payload: dict[str, Any]
+    created_at: datetime
+
+
+ArtifactType = Literal[
+    "creative_problem",
+    "editorial_point_of_view",
+    "audience_experience",
+    "story_argument_model",
+    "direction_bible",
+    "visual_language",
+    "sound_direction",
+    "production_constraints",
+    "risk_register",
+]
+
+ConfidenceLevel = Literal["low", "medium", "high"]
+
+
+class ArtifactCreate(BaseModel):
+    owner_user_id: UUID
+    artifact_type: ArtifactType
+    title: str = Field(min_length=1, max_length=240)
+    production_id: UUID | None = None
+    piece_id: UUID | None = None
+
+    _title = field_validator("title")(_strip_nonempty)
+
+
+class ArtifactRead(OrmModel):
+    id: UUID
+    project_id: UUID
+    production_id: UUID | None
+    piece_id: UUID | None
+    owner_user_id: UUID
+    artifact_type: str
+    title: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class ArtifactVersionCreate(BaseModel):
+    schema_version: str = Field(min_length=1, max_length=40)
+    author_user_id: UUID
+    confidence_level: ConfidenceLevel
+    body: dict[str, Any]
+    linked_decisions: list[UUID] = Field(default_factory=list)
+    linked_evidence: list[str] = Field(default_factory=list, max_length=100)
+    open_questions: list[str] = Field(default_factory=list, max_length=100)
+    parent_version_id: UUID | None = None
+
+    _schema_version = field_validator("schema_version")(_strip_nonempty)
+
+    @field_validator("body")
+    @classmethod
+    def validate_body(cls, value: dict[str, Any]) -> dict[str, Any]:
+        if not value:
+            raise ValueError("body must not be empty")
+        return value
+
+    @field_validator("linked_evidence", "open_questions")
+    @classmethod
+    def validate_string_list(cls, value: list[str]) -> list[str]:
+        cleaned = []
+        for item in value:
+            stripped = item.strip()
+            if not stripped:
+                raise ValueError("list items must not be empty")
+            cleaned.append(stripped)
+        return cleaned
+
+
+class ArtifactVersionRead(OrmModel):
+    id: UUID
+    artifact_id: UUID
+    version_number: int
+    schema_version: str
+    author_user_id: UUID
+    parent_version_id: UUID | None
+    confidence_level: str
+    body: dict[str, Any]
+    linked_decisions: list[UUID]
+    linked_evidence: list[str]
+    open_questions: list[str]
     created_at: datetime
