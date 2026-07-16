@@ -6,4 +6,6 @@
 - Guarantees: score branch/event writes are audited and project-scoped.
 - Phase 3.2 foundation implemented: score lane entries for the build-plan lane set.
 - Guarantees: lane entries require explicit intent, lane-specific content, audit, and project-scoped links.
+- Phase 3.3 foundation implemented: editorial relationships between score events.
+- Guarantees: beat/cut relationships require explicit editorial reasoning and same-branch event links.
 - Not built: UI timeline editor, renderer, NLE bridge, AI generation, asset intelligence, preview engine, autonomous agents.

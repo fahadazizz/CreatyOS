@@ -437,6 +437,22 @@ ScoreLaneType = Literal[
     "review_notes",
 ]
 ScoreLaneEntryStatus = Literal["planned", "needs_proof", "approved", "superseded"]
+ScoreEventRelationshipType = Literal[
+    "reveal",
+    "contrast",
+    "continuation",
+    "interruption",
+    "escalation",
+    "compression",
+    "reaction",
+    "pause",
+    "payoff",
+    "transition",
+    "misdirection",
+    "evidence_support",
+]
+ScoreEventRelationshipStatus = Literal["planned", "needs_proof", "approved", "superseded"]
+ScoreEventRelationshipDirection = Literal["outgoing", "incoming", "all"]
 
 
 BLACKBOARD_PAYLOAD_REQUIREMENTS: dict[BlackboardEntryType, tuple[str, ...]] = {
@@ -837,6 +853,48 @@ class AudiovisualScoreLaneEntryRead(OrmModel):
     title: str
     intent: str
     content: dict[str, Any]
+    status: str
+    linked_artifact_version_id: UUID | None
+    linked_decision_id: UUID | None
+    linked_blackboard_entry_id: UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AudiovisualScoreEventRelationshipCreate(BaseModel):
+    created_by_user_id: UUID
+    to_event_id: UUID
+    relationship_type: ScoreEventRelationshipType
+    title: str = Field(min_length=1, max_length=240)
+    rationale: str = Field(min_length=1, max_length=4000)
+    expected_viewer_effect: str = Field(min_length=1, max_length=4000)
+    timing_logic: str = Field(min_length=1, max_length=4000)
+    continuity_impact: str = Field(min_length=1, max_length=4000)
+    status: ScoreEventRelationshipStatus = "planned"
+    linked_artifact_version_id: UUID | None = None
+    linked_decision_id: UUID | None = None
+    linked_blackboard_entry_id: UUID | None = None
+
+    _title = field_validator("title")(_strip_nonempty)
+    _rationale = field_validator("rationale")(_strip_nonempty)
+    _expected_viewer_effect = field_validator("expected_viewer_effect")(_strip_nonempty)
+    _timing_logic = field_validator("timing_logic")(_strip_nonempty)
+    _continuity_impact = field_validator("continuity_impact")(_strip_nonempty)
+
+
+class AudiovisualScoreEventRelationshipRead(OrmModel):
+    id: UUID
+    branch_id: UUID
+    project_id: UUID
+    created_by_user_id: UUID
+    from_event_id: UUID
+    to_event_id: UUID
+    relationship_type: str
+    title: str
+    rationale: str
+    expected_viewer_effect: str
+    timing_logic: str
+    continuity_impact: str
     status: str
     linked_artifact_version_id: UUID | None
     linked_decision_id: UUID | None

@@ -358,6 +358,9 @@ class AudiovisualScoreBranch(TimestampMixin, Base):
     events: Mapped[list["AudiovisualScoreEvent"]] = relationship(
         back_populates="branch", order_by="AudiovisualScoreEvent.sort_key"
     )
+    event_relationships: Mapped[list["AudiovisualScoreEventRelationship"]] = relationship(
+        back_populates="branch", order_by="AudiovisualScoreEventRelationship.created_at"
+    )
 
 
 class AudiovisualScoreEvent(TimestampMixin, Base):
@@ -425,3 +428,38 @@ class AudiovisualScoreLaneEntry(TimestampMixin, Base):
     )
 
     score_event: Mapped[AudiovisualScoreEvent] = relationship(back_populates="lane_entries")
+
+
+class AudiovisualScoreEventRelationship(TimestampMixin, Base):
+    __tablename__ = "audiovisual_score_event_relationships"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    branch_id: Mapped[str] = mapped_column(
+        ForeignKey("audiovisual_score_branches.id"), nullable=False, index=True
+    )
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    created_by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    from_event_id: Mapped[str] = mapped_column(
+        ForeignKey("audiovisual_score_events.id"), nullable=False, index=True
+    )
+    to_event_id: Mapped[str] = mapped_column(
+        ForeignKey("audiovisual_score_events.id"), nullable=False, index=True
+    )
+    relationship_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(240), nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    expected_viewer_effect: Mapped[str] = mapped_column(Text, nullable=False)
+    timing_logic: Mapped[str] = mapped_column(Text, nullable=False)
+    continuity_impact: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="planned", index=True)
+    linked_artifact_version_id: Mapped[str | None] = mapped_column(
+        ForeignKey("artifact_versions.id"), nullable=True, index=True
+    )
+    linked_decision_id: Mapped[str | None] = mapped_column(
+        ForeignKey("decisions.id"), nullable=True, index=True
+    )
+    linked_blackboard_entry_id: Mapped[str | None] = mapped_column(
+        ForeignKey("blackboard_entries.id"), nullable=True, index=True
+    )
+
+    branch: Mapped[AudiovisualScoreBranch] = relationship(back_populates="event_relationships")

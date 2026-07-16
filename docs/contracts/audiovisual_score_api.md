@@ -8,3 +8,6 @@
 - `POST/GET /api/v1/score-events/{event_id}/lane-entries`; `GET /api/v1/score-branches/{branch_id}/lane-entries`; `GET /api/v1/score-lane-entries/{lane_entry_id}`.
 - Score lane entries require non-empty `intent` and lane-specific `content` keys.
 - Score lane links are project-scoped; lane entries cannot exist without an existing score event.
+- `POST/GET /api/v1/score-events/{event_id}/relationships`; `GET /api/v1/score-branches/{branch_id}/relationships`; `GET /api/v1/score-relationships/{relationship_id}`.
+- Score relationships require non-empty `rationale`, `expected_viewer_effect`, `timing_logic`, and `continuity_impact`.
+- Score relationships must connect two different events in the same branch; linked proof/decision/artifact references are project-scoped.

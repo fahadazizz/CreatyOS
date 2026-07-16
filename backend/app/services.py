@@ -289,6 +289,33 @@ def _score_lane_entry_read(
     )
 
 
+def _score_event_relationship_read(
+    relationship: models.AudiovisualScoreEventRelationship,
+) -> schemas.AudiovisualScoreEventRelationshipRead:
+    return schemas.AudiovisualScoreEventRelationshipRead.model_validate(
+        {
+            "id": relationship.id,
+            "branch_id": relationship.branch_id,
+            "project_id": relationship.project_id,
+            "created_by_user_id": relationship.created_by_user_id,
+            "from_event_id": relationship.from_event_id,
+            "to_event_id": relationship.to_event_id,
+            "relationship_type": relationship.relationship_type,
+            "title": relationship.title,
+            "rationale": relationship.rationale,
+            "expected_viewer_effect": relationship.expected_viewer_effect,
+            "timing_logic": relationship.timing_logic,
+            "continuity_impact": relationship.continuity_impact,
+            "status": relationship.status,
+            "linked_artifact_version_id": relationship.linked_artifact_version_id,
+            "linked_decision_id": relationship.linked_decision_id,
+            "linked_blackboard_entry_id": relationship.linked_blackboard_entry_id,
+            "created_at": relationship.created_at,
+            "updated_at": relationship.updated_at,
+        }
+    )
+
+
 def _validate_blackboard_targets(
     db: Session,
     *,
@@ -1758,3 +1785,115 @@ def get_score_lane_entry(
     db: Session, lane_entry_id: str
 ) -> schemas.AudiovisualScoreLaneEntryRead:
     return _score_lane_entry_read(_one(db, models.AudiovisualScoreLaneEntry, lane_entry_id))
+
+
+def create_score_event_relationship(
+    db: Session, from_event_id: str, data: schemas.AudiovisualScoreEventRelationshipCreate
+) -> schemas.AudiovisualScoreEventRelationshipRead:
+    from_event = _one(db, models.AudiovisualScoreEvent, from_event_id)
+    to_event = _one(db, models.AudiovisualScoreEvent, str(data.to_event_id))
+    if from_event.id == to_event.id:
+        raise ValidationError("score event relationship cannot point to itself")
+    if from_event.branch_id != to_event.branch_id:
+        raise ValidationError("score event relationship requires events in the same branch")
+
+    project = _one(db, models.Project, from_event.project_id)
+    _one(db, models.User, str(data.created_by_user_id))
+
+    linked_artifact_version_id = (
+        str(data.linked_artifact_version_id) if data.linked_artifact_version_id else None
+    )
+    linked_decision_id = str(data.linked_decision_id) if data.linked_decision_id else None
+    linked_blackboard_entry_id = (
+        str(data.linked_blackboard_entry_id) if data.linked_blackboard_entry_id else None
+    )
+    _validate_score_links(
+        db,
+        project=project,
+        artifact_version_id=linked_artifact_version_id,
+        decision_id=linked_decision_id,
+        blackboard_entry_id=linked_blackboard_entry_id,
+    )
+
+    relationship = models.AudiovisualScoreEventRelationship(
+        branch_id=from_event.branch_id,
+        project_id=project.id,
+        created_by_user_id=str(data.created_by_user_id),
+        from_event_id=from_event.id,
+        to_event_id=to_event.id,
+        relationship_type=data.relationship_type,
+        title=data.title,
+        rationale=data.rationale,
+        expected_viewer_effect=data.expected_viewer_effect,
+        timing_logic=data.timing_logic,
+        continuity_impact=data.continuity_impact,
+        status=data.status,
+        linked_artifact_version_id=linked_artifact_version_id,
+        linked_decision_id=linked_decision_id,
+        linked_blackboard_entry_id=linked_blackboard_entry_id,
+    )
+    db.add(relationship)
+    db.flush()
+    _audit(
+        db,
+        entity_type="audiovisual_score_event_relationship",
+        entity_id=relationship.id,
+        action="created",
+        actor_user_id=relationship.created_by_user_id,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={
+            "from_event_id": relationship.from_event_id,
+            "to_event_id": relationship.to_event_id,
+            "relationship_type": relationship.relationship_type,
+            "status": relationship.status,
+        },
+    )
+    db.commit()
+    db.refresh(relationship)
+    return _score_event_relationship_read(relationship)
+
+
+def list_score_event_relationships(
+    db: Session, event_id: str, direction: str = "outgoing"
+) -> list[schemas.AudiovisualScoreEventRelationshipRead]:
+    _one(db, models.AudiovisualScoreEvent, event_id)
+    query = select(models.AudiovisualScoreEventRelationship)
+    if direction == "outgoing":
+        query = query.where(models.AudiovisualScoreEventRelationship.from_event_id == event_id)
+    elif direction == "incoming":
+        query = query.where(models.AudiovisualScoreEventRelationship.to_event_id == event_id)
+    else:
+        query = query.where(
+            (models.AudiovisualScoreEventRelationship.from_event_id == event_id)
+            | (models.AudiovisualScoreEventRelationship.to_event_id == event_id)
+        )
+    relationships = db.scalars(query.order_by(models.AudiovisualScoreEventRelationship.created_at)).all()
+    return [_score_event_relationship_read(relationship) for relationship in relationships]
+
+
+def list_score_branch_relationships(
+    db: Session, branch_id: str, relationship_type: str | None = None
+) -> list[schemas.AudiovisualScoreEventRelationshipRead]:
+    _one(db, models.AudiovisualScoreBranch, branch_id)
+    query = (
+        select(models.AudiovisualScoreEventRelationship)
+        .where(models.AudiovisualScoreEventRelationship.branch_id == branch_id)
+        .order_by(models.AudiovisualScoreEventRelationship.created_at)
+    )
+    if relationship_type is not None:
+        query = query.where(
+            models.AudiovisualScoreEventRelationship.relationship_type == relationship_type
+        )
+    return [
+        _score_event_relationship_read(relationship)
+        for relationship in db.scalars(query).all()
+    ]
+
+
+def get_score_event_relationship(
+    db: Session, relationship_id: str
+) -> schemas.AudiovisualScoreEventRelationshipRead:
+    return _score_event_relationship_read(
+        _one(db, models.AudiovisualScoreEventRelationship, relationship_id)
+    )

@@ -595,3 +595,66 @@ async def get_score_lane_entry(lane_entry_id: UUID, db: Session = Depends(get_db
         return services.get_score_lane_entry(db, str(lane_entry_id))
     except Exception as exc:
         _handle_error(exc)
+
+
+@router.post(
+    "/score-events/{from_event_id}/relationships",
+    response_model=schemas.AudiovisualScoreEventRelationshipRead,
+    status_code=201,
+)
+async def create_score_event_relationship(
+    from_event_id: UUID,
+    payload: schemas.AudiovisualScoreEventRelationshipCreate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.create_score_event_relationship(db, str(from_event_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/score-events/{event_id}/relationships",
+    response_model=list[schemas.AudiovisualScoreEventRelationshipRead],
+)
+async def list_score_event_relationships(
+    event_id: UUID,
+    direction: schemas.ScoreEventRelationshipDirection = Query(default="outgoing"),
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.list_score_event_relationships(
+            db, str(event_id), direction=direction
+        )
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/score-branches/{branch_id}/relationships",
+    response_model=list[schemas.AudiovisualScoreEventRelationshipRead],
+)
+async def list_score_branch_relationships(
+    branch_id: UUID,
+    relationship_type: schemas.ScoreEventRelationshipType | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.list_score_branch_relationships(
+            db, str(branch_id), relationship_type=relationship_type
+        )
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/score-relationships/{relationship_id}",
+    response_model=schemas.AudiovisualScoreEventRelationshipRead,
+)
+async def get_score_event_relationship(
+    relationship_id: UUID, db: Session = Depends(get_db)
+):
+    try:
+        return services.get_score_event_relationship(db, str(relationship_id))
+    except Exception as exc:
+        _handle_error(exc)
