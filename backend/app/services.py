@@ -265,6 +265,30 @@ def _score_event_read(
     )
 
 
+def _score_lane_entry_read(
+    entry: models.AudiovisualScoreLaneEntry,
+) -> schemas.AudiovisualScoreLaneEntryRead:
+    return schemas.AudiovisualScoreLaneEntryRead.model_validate(
+        {
+            "id": entry.id,
+            "branch_id": entry.branch_id,
+            "score_event_id": entry.score_event_id,
+            "project_id": entry.project_id,
+            "created_by_user_id": entry.created_by_user_id,
+            "lane_type": entry.lane_type,
+            "title": entry.title,
+            "intent": entry.intent,
+            "content": json.loads(entry.content_json),
+            "status": entry.status,
+            "linked_artifact_version_id": entry.linked_artifact_version_id,
+            "linked_decision_id": entry.linked_decision_id,
+            "linked_blackboard_entry_id": entry.linked_blackboard_entry_id,
+            "created_at": entry.created_at,
+            "updated_at": entry.updated_at,
+        }
+    )
+
+
 def _validate_blackboard_targets(
     db: Session,
     *,
@@ -1642,3 +1666,95 @@ def list_score_events(
 
 def get_score_event(db: Session, event_id: str) -> schemas.AudiovisualScoreEventRead:
     return _score_event_read(_one(db, models.AudiovisualScoreEvent, event_id))
+
+
+def create_score_lane_entry(
+    db: Session, event_id: str, data: schemas.AudiovisualScoreLaneEntryCreate
+) -> schemas.AudiovisualScoreLaneEntryRead:
+    score_event = _one(db, models.AudiovisualScoreEvent, event_id)
+    project = _one(db, models.Project, score_event.project_id)
+    _one(db, models.User, str(data.created_by_user_id))
+
+    linked_artifact_version_id = (
+        str(data.linked_artifact_version_id) if data.linked_artifact_version_id else None
+    )
+    linked_decision_id = str(data.linked_decision_id) if data.linked_decision_id else None
+    linked_blackboard_entry_id = (
+        str(data.linked_blackboard_entry_id) if data.linked_blackboard_entry_id else None
+    )
+    _validate_score_links(
+        db,
+        project=project,
+        artifact_version_id=linked_artifact_version_id,
+        decision_id=linked_decision_id,
+        blackboard_entry_id=linked_blackboard_entry_id,
+    )
+
+    entry = models.AudiovisualScoreLaneEntry(
+        branch_id=score_event.branch_id,
+        score_event_id=score_event.id,
+        project_id=project.id,
+        created_by_user_id=str(data.created_by_user_id),
+        lane_type=data.lane_type,
+        title=data.title,
+        intent=data.intent,
+        content_json=json.dumps(data.content, sort_keys=True),
+        status=data.status,
+        linked_artifact_version_id=linked_artifact_version_id,
+        linked_decision_id=linked_decision_id,
+        linked_blackboard_entry_id=linked_blackboard_entry_id,
+    )
+    db.add(entry)
+    db.flush()
+    _audit(
+        db,
+        entity_type="audiovisual_score_lane_entry",
+        entity_id=entry.id,
+        action="created",
+        actor_user_id=entry.created_by_user_id,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={
+            "score_event_id": entry.score_event_id,
+            "lane_type": entry.lane_type,
+            "title": entry.title,
+            "status": entry.status,
+        },
+    )
+    db.commit()
+    db.refresh(entry)
+    return _score_lane_entry_read(entry)
+
+
+def list_score_event_lane_entries(
+    db: Session, event_id: str, lane_type: str | None = None
+) -> list[schemas.AudiovisualScoreLaneEntryRead]:
+    _one(db, models.AudiovisualScoreEvent, event_id)
+    query = (
+        select(models.AudiovisualScoreLaneEntry)
+        .where(models.AudiovisualScoreLaneEntry.score_event_id == event_id)
+        .order_by(models.AudiovisualScoreLaneEntry.created_at)
+    )
+    if lane_type is not None:
+        query = query.where(models.AudiovisualScoreLaneEntry.lane_type == lane_type)
+    return [_score_lane_entry_read(entry) for entry in db.scalars(query).all()]
+
+
+def list_score_branch_lane_entries(
+    db: Session, branch_id: str, lane_type: str | None = None
+) -> list[schemas.AudiovisualScoreLaneEntryRead]:
+    _one(db, models.AudiovisualScoreBranch, branch_id)
+    query = (
+        select(models.AudiovisualScoreLaneEntry)
+        .where(models.AudiovisualScoreLaneEntry.branch_id == branch_id)
+        .order_by(models.AudiovisualScoreLaneEntry.created_at)
+    )
+    if lane_type is not None:
+        query = query.where(models.AudiovisualScoreLaneEntry.lane_type == lane_type)
+    return [_score_lane_entry_read(entry) for entry in db.scalars(query).all()]
+
+
+def get_score_lane_entry(
+    db: Session, lane_entry_id: str
+) -> schemas.AudiovisualScoreLaneEntryRead:
+    return _score_lane_entry_read(_one(db, models.AudiovisualScoreLaneEntry, lane_entry_id))

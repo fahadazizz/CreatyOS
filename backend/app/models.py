@@ -392,3 +392,36 @@ class AudiovisualScoreEvent(TimestampMixin, Base):
     )
 
     branch: Mapped[AudiovisualScoreBranch] = relationship(back_populates="events")
+    lane_entries: Mapped[list["AudiovisualScoreLaneEntry"]] = relationship(
+        back_populates="score_event", order_by="AudiovisualScoreLaneEntry.created_at"
+    )
+
+
+class AudiovisualScoreLaneEntry(TimestampMixin, Base):
+    __tablename__ = "audiovisual_score_lane_entries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    branch_id: Mapped[str] = mapped_column(
+        ForeignKey("audiovisual_score_branches.id"), nullable=False, index=True
+    )
+    score_event_id: Mapped[str] = mapped_column(
+        ForeignKey("audiovisual_score_events.id"), nullable=False, index=True
+    )
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    created_by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    lane_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(240), nullable=False)
+    intent: Mapped[str] = mapped_column(Text, nullable=False)
+    content_json: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="planned", index=True)
+    linked_artifact_version_id: Mapped[str | None] = mapped_column(
+        ForeignKey("artifact_versions.id"), nullable=True, index=True
+    )
+    linked_decision_id: Mapped[str | None] = mapped_column(
+        ForeignKey("decisions.id"), nullable=True, index=True
+    )
+    linked_blackboard_entry_id: Mapped[str | None] = mapped_column(
+        ForeignKey("blackboard_entries.id"), nullable=True, index=True
+    )
+
+    score_event: Mapped[AudiovisualScoreEvent] = relationship(back_populates="lane_entries")

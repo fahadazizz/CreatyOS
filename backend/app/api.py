@@ -538,3 +538,60 @@ async def get_score_event(event_id: UUID, db: Session = Depends(get_db)):
         return services.get_score_event(db, str(event_id))
     except Exception as exc:
         _handle_error(exc)
+
+
+@router.post(
+    "/score-events/{event_id}/lane-entries",
+    response_model=schemas.AudiovisualScoreLaneEntryRead,
+    status_code=201,
+)
+async def create_score_lane_entry(
+    event_id: UUID,
+    payload: schemas.AudiovisualScoreLaneEntryCreate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.create_score_lane_entry(db, str(event_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/score-events/{event_id}/lane-entries",
+    response_model=list[schemas.AudiovisualScoreLaneEntryRead],
+)
+async def list_score_event_lane_entries(
+    event_id: UUID,
+    lane_type: schemas.ScoreLaneType | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.list_score_event_lane_entries(db, str(event_id), lane_type=lane_type)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/score-branches/{branch_id}/lane-entries",
+    response_model=list[schemas.AudiovisualScoreLaneEntryRead],
+)
+async def list_score_branch_lane_entries(
+    branch_id: UUID,
+    lane_type: schemas.ScoreLaneType | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.list_score_branch_lane_entries(db, str(branch_id), lane_type=lane_type)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/score-lane-entries/{lane_entry_id}",
+    response_model=schemas.AudiovisualScoreLaneEntryRead,
+)
+async def get_score_lane_entry(lane_entry_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.get_score_lane_entry(db, str(lane_entry_id))
+    except Exception as exc:
+        _handle_error(exc)

@@ -424,6 +424,19 @@ ScoreHierarchyLevel = Literal[
 ]
 ScoreEventStatus = Literal["planned", "needs_proof", "approved", "superseded"]
 ScoreDurationPolicy = Literal["elastic", "fixed", "relative"]
+ScoreLaneType = Literal[
+    "audience_state",
+    "story_argument",
+    "image",
+    "performance_voice",
+    "graphics",
+    "sound_music",
+    "rhythm",
+    "evidence",
+    "production_state",
+    "review_notes",
+]
+ScoreLaneEntryStatus = Literal["planned", "needs_proof", "approved", "superseded"]
 
 
 BLACKBOARD_PAYLOAD_REQUIREMENTS: dict[BlackboardEntryType, tuple[str, ...]] = {
@@ -444,6 +457,19 @@ BLACKBOARD_PAYLOAD_REQUIREMENTS: dict[BlackboardEntryType, tuple[str, ...]] = {
         "recommended_owner",
         "acceptance_criteria",
     ),
+}
+
+SCORE_LANE_CONTENT_REQUIREMENTS: dict[ScoreLaneType, tuple[str, ...]] = {
+    "audience_state": ("entry_state", "exit_state", "attention_target"),
+    "story_argument": ("claim_or_turn", "information_delta", "evidence_role"),
+    "image": ("visual_subject", "framing_or_staging", "continuity"),
+    "performance_voice": ("speaker_or_subject", "objective", "delivery"),
+    "graphics": ("information_function", "content_truth", "readability"),
+    "sound_music": ("sound_source", "dynamic_state", "mix_intent"),
+    "rhythm": ("pace", "cut_or_hold_logic", "energy_shift"),
+    "evidence": ("claim", "source_requirement", "proof_status"),
+    "production_state": ("requirement", "owner_or_source", "status"),
+    "review_notes": ("note", "reviewer_context", "requested_action"),
 }
 
 
@@ -767,6 +793,50 @@ class AudiovisualScoreEventRead(OrmModel):
     how: str
     where_when: ScoreWhereWhen
     duration_policy: str
+    status: str
+    linked_artifact_version_id: UUID | None
+    linked_decision_id: UUID | None
+    linked_blackboard_entry_id: UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AudiovisualScoreLaneEntryCreate(BaseModel):
+    created_by_user_id: UUID
+    lane_type: ScoreLaneType
+    title: str = Field(min_length=1, max_length=240)
+    intent: str = Field(min_length=1, max_length=4000)
+    content: dict[str, Any]
+    status: ScoreLaneEntryStatus = "planned"
+    linked_artifact_version_id: UUID | None = None
+    linked_decision_id: UUID | None = None
+    linked_blackboard_entry_id: UUID | None = None
+
+    _title = field_validator("title")(_strip_nonempty)
+    _intent = field_validator("intent")(_strip_nonempty)
+
+    @model_validator(mode="after")
+    def validate_lane_content(self) -> "AudiovisualScoreLaneEntryCreate":
+        if not self.content:
+            raise ValueError("content must not be empty")
+        _require_payload_keys(
+            self.content,
+            self.lane_type,
+            SCORE_LANE_CONTENT_REQUIREMENTS[self.lane_type],
+        )
+        return self
+
+
+class AudiovisualScoreLaneEntryRead(OrmModel):
+    id: UUID
+    branch_id: UUID
+    score_event_id: UUID
+    project_id: UUID
+    created_by_user_id: UUID
+    lane_type: str
+    title: str
+    intent: str
+    content: dict[str, Any]
     status: str
     linked_artifact_version_id: UUID | None
     linked_decision_id: UUID | None
