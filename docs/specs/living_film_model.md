@@ -59,6 +59,8 @@ The system assigns version numbers. Clients cannot overwrite prior versions.
 
 Linked decisions must exist and belong to the same project as the artifact.
 
+Artifact bodies are schema-specific. Each artifact type has exactly one supported v1 schema in Milestone 1, and the `schema_version` must match the artifact type. Unknown body fields are rejected.
+
 ## Decision Log
 
 Decisions are first-class project-scoped records. They capture:
@@ -102,11 +104,10 @@ A script, brief, prompt, model output, or note does not become Living Film Model
 
 ## Current Limits
 
-Phase 1 validates artifact type, ownership, project scope, non-empty version body, schema version, confidence level, parent version scope, linked decision scope, linked evidence text, open question text, decision alternatives, rationale, selected option, status, evidence, risk, affected scope, creative input type, and creative input candidate body.
+Phase 1 validates artifact type, ownership, project scope, artifact-specific version body schema, schema version compatibility, confidence level, parent version scope, linked decision scope, linked evidence text, open question text, decision alternatives, rationale, selected option, status, evidence, risk, affected scope, creative input type, and creative input candidate body.
 
 It does not yet implement:
 
-- schema-specific body validation for each artifact type;
 - evidence registry persistence;
 - approval gates;
 - AI extraction from creative inputs;

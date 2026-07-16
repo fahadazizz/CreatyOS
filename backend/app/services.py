@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.artifact_contracts import validate_artifact_body
 from app import models, schemas
 
 
@@ -359,6 +360,14 @@ def create_artifact_version(
     artifact = _one(db, models.Artifact, artifact_id)
     project = _one(db, models.Project, artifact.project_id)
     _one(db, models.User, str(data.author_user_id))
+    try:
+        validated_body = validate_artifact_body(
+            artifact_type=artifact.artifact_type,
+            schema_version=data.schema_version,
+            body=data.body,
+        )
+    except ValueError as exc:
+        raise ValidationError(str(exc)) from exc
 
     parent_version_id = str(data.parent_version_id) if data.parent_version_id else None
     if parent_version_id is not None:
@@ -386,13 +395,17 @@ def create_artifact_version(
         author_user_id=str(data.author_user_id),
         parent_version_id=parent_version_id,
         confidence_level=data.confidence_level,
-        body_json=json.dumps(data.body, sort_keys=True),
+        body_json=json.dumps(validated_body, sort_keys=True),
         linked_decisions_json=json.dumps([str(item) for item in data.linked_decisions]),
         linked_evidence_json=json.dumps(data.linked_evidence),
         open_questions_json=json.dumps(data.open_questions),
     )
     db.add(version)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        raise ConflictError("artifact version number conflict; retry version creation") from exc
     _audit(
         db,
         entity_type="artifact_version",

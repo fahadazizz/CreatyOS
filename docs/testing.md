@@ -45,7 +45,9 @@ Phase 1.2 artifact/version tests verify:
 
 - artifact type validation;
 - script is not a Living Film Model artifact type;
-- version body validation;
+- artifact-type-specific version body validation;
+- schema version compatibility with artifact type;
+- unknown artifact body fields are rejected;
 - append-only version numbering;
 - prior versions remain readable;
 - artifact and artifact version audit events.
@@ -72,6 +74,12 @@ Run Alembic migrations:
 ```bash
 cd backend
 PYTHONPATH=. alembic upgrade head
+```
+
+Run full repository verification:
+
+```bash
+scripts/verify.sh
 ```
 
 ## Anti-Slop Test Expectations

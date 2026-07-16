@@ -57,6 +57,20 @@ async def _project_context(client: httpx.AsyncClient) -> tuple[str, str]:
     return project.json()["id"], user.json()["id"]
 
 
+def creative_problem_body(objective: str) -> dict:
+    return {
+        "audience": "creative founders",
+        "objective": objective,
+        "central_tension_or_opportunity": "AI media volume competes with authored work.",
+        "topic_vs_thesis": "The topic is automated video; the thesis is direction first.",
+        "constraints": ["No renderer-first product.", "No script as timeline truth."],
+        "known_unknowns": ["Which route will demonstrate the difference clearly?"],
+        "decision_owners": ["creative owner"],
+        "failure_definition": "The system behaves like a script-to-video generator.",
+        "worth_producing_if": "The project preserves decision ancestry.",
+    }
+
+
 async def _artifact_with_version(client: httpx.AsyncClient) -> tuple[str, str, str, str]:
     project_id, user_id = await _project_context(client)
     artifact = await client.post(
@@ -73,7 +87,7 @@ async def _artifact_with_version(client: httpx.AsyncClient) -> tuple[str, str, s
             "schema_version": "creative_problem.v1",
             "author_user_id": user_id,
             "confidence_level": "medium",
-            "body": {"objective": "choose the most defensible route"},
+            "body": creative_problem_body("choose the most defensible route"),
         },
     )
     return project_id, user_id, artifact.json()["id"], version.json()["id"]
@@ -180,7 +194,7 @@ async def test_artifact_version_linked_decisions_must_exist(
             "schema_version": "creative_problem.v1",
             "author_user_id": user_id,
             "confidence_level": "high",
-            "body": {"objective": "record decision-linked source of truth"},
+            "body": creative_problem_body("record decision-linked source of truth"),
             "linked_decisions": [decision.json()["id"]],
         },
     )
@@ -193,7 +207,7 @@ async def test_artifact_version_linked_decisions_must_exist(
             "schema_version": "creative_problem.v1",
             "author_user_id": user_id,
             "confidence_level": "high",
-            "body": {"objective": "invalid decision link"},
+            "body": creative_problem_body("invalid decision link"),
             "linked_decisions": ["00000000-0000-0000-0000-000000000099"],
         },
     )

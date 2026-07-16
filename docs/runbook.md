@@ -55,6 +55,12 @@ Run backend tests:
 PYTHONPATH=backend python -m pytest backend/tests
 ```
 
+Run full verification:
+
+```bash
+scripts/verify.sh
+```
+
 Create a Living Film Model artifact after creating a project and user:
 
 ```bash
@@ -68,7 +74,7 @@ Append an artifact version:
 ```bash
 curl -X POST http://localhost:8000/api/v1/artifacts/{artifact_id}/versions \
   -H "Content-Type: application/json" \
-  -d '{"schema_version":"creative_problem.v1","author_user_id":"{user_id}","confidence_level":"medium","body":{"objective":"define the creative problem"}}'
+  -d '{"schema_version":"creative_problem.v1","author_user_id":"{user_id}","confidence_level":"medium","body":{"audience":"creative founders","objective":"define the creative problem","central_tension_or_opportunity":"AI video is easy to generate but hard to direct.","topic_vs_thesis":"The topic is AI video; the thesis is direction first.","constraints":["No script-to-video default."],"known_unknowns":["Which proof best shows the risk?"],"decision_owners":["creative owner"],"failure_definition":"The work becomes generic media assembly.","worth_producing_if":"It proves authored direction beats assembly."}}'
 ```
 
 Create a decision:

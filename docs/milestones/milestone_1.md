@@ -96,6 +96,8 @@ Out of scope:
 - Model/script inputs cannot become source of truth without explicit artifact version creation.
 - Script is not an artifact type.
 - Prior artifact versions remain readable after newer versions are appended.
+- Artifact version bodies are validated against artifact-type-specific v1 schemas.
+- Schema versions must match artifact types.
 
 ## Phase 1.3 - Decision Log
 
@@ -135,4 +137,6 @@ Out of scope:
 
 ## Milestone Exit Criteria
 
-Milestone 1 is complete. The system can create a project, ingest messy creative input as candidate-only records, produce structured Living Film Model artifacts, track decisions, and maintain append-only versions. No video generation is implemented or required.
+Milestone 1 is complete for internal foundation use. The system can create a project, ingest messy creative input as candidate-only records, produce schema-validated Living Film Model artifacts, track decisions, and maintain append-only versions. No video generation is implemented or required.
+
+Before external production exposure, the API still needs an authentication and authorization boundary.

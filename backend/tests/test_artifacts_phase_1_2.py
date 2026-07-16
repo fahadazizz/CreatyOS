@@ -60,6 +60,32 @@ async def _project_context(client: httpx.AsyncClient) -> tuple[str, str]:
     return project.json()["id"], user.json()["id"]
 
 
+def creative_problem_body(objective: str) -> dict:
+    return {
+        "audience": "curious founders",
+        "objective": objective,
+        "central_tension_or_opportunity": "AI media is easy to generate but hard to direct.",
+        "topic_vs_thesis": "The topic is AI video; the thesis is that direction is the moat.",
+        "constraints": ["No script-to-video default.", "No renderer-first workflow."],
+        "known_unknowns": ["Which proof best exposes generic assembly risk?"],
+        "decision_owners": ["creative owner"],
+        "failure_definition": "The project becomes a polished media assembly demo.",
+        "worth_producing_if": "It proves authored direction beats generic output.",
+    }
+
+
+def risk_register_body() -> dict:
+    return {
+        "risks": ["generic visual fallback"],
+        "impact": "Weakens authored specificity.",
+        "likelihood": "medium",
+        "mitigations": ["Require proof before production.", "Reject generic B-roll."],
+        "proof_needed": ["route comparison", "representative sequence proof"],
+        "owner": "creative owner",
+        "status": "open",
+    }
+
+
 @pytest.mark.anyio
 async def test_create_artifact_and_append_only_versions(client: httpx.AsyncClient) -> None:
     project_id, user_id = await _project_context(client)
@@ -81,10 +107,7 @@ async def test_create_artifact_and_append_only_versions(client: httpx.AsyncClien
             "schema_version": "creative_problem.v1",
             "author_user_id": user_id,
             "confidence_level": "medium",
-            "body": {
-                "audience": "curious founders",
-                "objective": "show the strategic cost of generic AI video",
-            },
+            "body": creative_problem_body("show the strategic cost of generic AI video"),
             "linked_decisions": [],
             "linked_evidence": ["brief:founder-interview"],
             "open_questions": ["What example best proves the risk?"],
@@ -101,10 +124,7 @@ async def test_create_artifact_and_append_only_versions(client: httpx.AsyncClien
             "author_user_id": user_id,
             "parent_version_id": first_version.json()["id"],
             "confidence_level": "high",
-            "body": {
-                "audience": "creative founders",
-                "objective": "prove direction beats media assembly",
-            },
+            "body": creative_problem_body("prove direction beats media assembly"),
             "linked_decisions": [],
             "linked_evidence": ["brief:founder-interview", "source:reference-architecture"],
             "open_questions": [],
@@ -157,6 +177,46 @@ async def test_artifact_type_and_version_body_are_validated(client: httpx.AsyncC
 
 
 @pytest.mark.anyio
+async def test_artifact_version_rejects_schema_mismatch_and_unknown_fields(
+    client: httpx.AsyncClient,
+) -> None:
+    project_id, user_id = await _project_context(client)
+    artifact = await client.post(
+        f"/api/v1/projects/{project_id}/artifacts",
+        json={
+            "owner_user_id": user_id,
+            "artifact_type": "creative_problem",
+            "title": "Creative Problem",
+        },
+    )
+    assert artifact.status_code == 201
+
+    schema_mismatch = await client.post(
+        f"/api/v1/artifacts/{artifact.json()['id']}/versions",
+        json={
+            "schema_version": "risk_register.v1",
+            "author_user_id": user_id,
+            "confidence_level": "medium",
+            "body": creative_problem_body("mismatched schema should fail"),
+        },
+    )
+    assert schema_mismatch.status_code == 422
+
+    body = creative_problem_body("unknown fields should fail")
+    body["script_sentence_mapping"] = "forbidden"
+    extra_field = await client.post(
+        f"/api/v1/artifacts/{artifact.json()['id']}/versions",
+        json={
+            "schema_version": "creative_problem.v1",
+            "author_user_id": user_id,
+            "confidence_level": "medium",
+            "body": body,
+        },
+    )
+    assert extra_field.status_code == 422
+
+
+@pytest.mark.anyio
 async def test_artifact_version_writes_audit_event(client: httpx.AsyncClient) -> None:
     project_id, user_id = await _project_context(client)
     artifact = await client.post(
@@ -173,7 +233,7 @@ async def test_artifact_version_writes_audit_event(client: httpx.AsyncClient) ->
             "schema_version": "risk_register.v1",
             "author_user_id": user_id,
             "confidence_level": "low",
-            "body": {"risks": ["generic visual fallback"]},
+            "body": risk_register_body(),
             "open_questions": ["What proof should retire this risk?"],
         },
     )
