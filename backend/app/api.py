@@ -389,3 +389,63 @@ async def get_specialist_proposal(proposal_id: UUID, db: Session = Depends(get_d
         return services.get_specialist_proposal(db, str(proposal_id))
     except Exception as exc:
         _handle_error(exc)
+
+
+@router.post(
+    "/projects/{project_id}/human-checkpoints",
+    response_model=schemas.HumanCheckpointRead,
+    status_code=201,
+)
+async def create_human_checkpoint(
+    project_id: UUID,
+    payload: schemas.HumanCheckpointCreate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.create_human_checkpoint(db, str(project_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/projects/{project_id}/human-checkpoints",
+    response_model=list[schemas.HumanCheckpointRead],
+)
+async def list_project_human_checkpoints(
+    project_id: UUID,
+    checkpoint_type: schemas.HumanCheckpointType | None = Query(default=None),
+    decision_status: schemas.HumanCheckpointStatus | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.list_project_human_checkpoints(
+            db,
+            str(project_id),
+            checkpoint_type=checkpoint_type,
+            decision_status=decision_status,
+        )
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get("/human-checkpoints/{checkpoint_id}", response_model=schemas.HumanCheckpointRead)
+async def get_human_checkpoint(checkpoint_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.get_human_checkpoint(db, str(checkpoint_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.patch(
+    "/human-checkpoints/{checkpoint_id}/decision",
+    response_model=schemas.HumanCheckpointRead,
+)
+async def decide_human_checkpoint(
+    checkpoint_id: UUID,
+    payload: schemas.HumanCheckpointDecisionUpdate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.decide_human_checkpoint(db, str(checkpoint_id), payload)
+    except Exception as exc:
+        _handle_error(exc)

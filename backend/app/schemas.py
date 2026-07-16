@@ -400,6 +400,17 @@ SpecialistProposalKind = Literal[
     "risk_response",
 ]
 SpecialistProposalStatus = Literal["submitted"]
+HumanCheckpointType = Literal[
+    "project_thesis",
+    "creative_route",
+    "audience_promise",
+    "final_treatment",
+    "visual_language",
+    "production_plan",
+    "edit_direction",
+    "final_release",
+]
+HumanCheckpointStatus = Literal["pending", "approved", "revision_requested", "blocked"]
 
 
 BLACKBOARD_PAYLOAD_REQUIREMENTS: dict[BlackboardEntryType, tuple[str, ...]] = {
@@ -599,6 +610,50 @@ class SpecialistProposalRead(OrmModel):
     evidence: list[str]
     risks: list[str]
     status: str
+    target_artifact_id: UUID | None
+    target_artifact_version_id: UUID | None
+    target_decision_id: UUID | None
+    target_creative_input_id: UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class HumanCheckpointCreate(BaseModel):
+    requested_by_user_id: UUID
+    checkpoint_type: HumanCheckpointType
+    title: str = Field(min_length=1, max_length=240)
+    summary: str = Field(min_length=1, max_length=4000)
+    linked_blackboard_entry_id: UUID | None = None
+    linked_deliberation_record_id: UUID | None = None
+    target_artifact_id: UUID | None = None
+    target_artifact_version_id: UUID | None = None
+    target_decision_id: UUID | None = None
+    target_creative_input_id: UUID | None = None
+
+    _title = field_validator("title")(_strip_nonempty)
+    _summary = field_validator("summary")(_strip_nonempty)
+
+
+class HumanCheckpointDecisionUpdate(BaseModel):
+    decided_by_user_id: UUID
+    decision_status: Literal["approved", "revision_requested", "blocked"]
+    decision_rationale: str = Field(min_length=1, max_length=4000)
+
+    _decision_rationale = field_validator("decision_rationale")(_strip_nonempty)
+
+
+class HumanCheckpointRead(OrmModel):
+    id: UUID
+    project_id: UUID
+    requested_by_user_id: UUID
+    decided_by_user_id: UUID | None
+    checkpoint_type: str
+    title: str
+    summary: str
+    decision_status: str
+    decision_rationale: str | None
+    linked_blackboard_entry_id: UUID | None
+    linked_deliberation_record_id: UUID | None
     target_artifact_id: UUID | None
     target_artifact_version_id: UUID | None
     target_decision_id: UUID | None

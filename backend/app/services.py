@@ -192,6 +192,32 @@ def _specialist_proposal_read(
     )
 
 
+def _human_checkpoint_read(
+    checkpoint: models.HumanCheckpoint,
+) -> schemas.HumanCheckpointRead:
+    return schemas.HumanCheckpointRead.model_validate(
+        {
+            "id": checkpoint.id,
+            "project_id": checkpoint.project_id,
+            "requested_by_user_id": checkpoint.requested_by_user_id,
+            "decided_by_user_id": checkpoint.decided_by_user_id,
+            "checkpoint_type": checkpoint.checkpoint_type,
+            "title": checkpoint.title,
+            "summary": checkpoint.summary,
+            "decision_status": checkpoint.decision_status,
+            "decision_rationale": checkpoint.decision_rationale,
+            "linked_blackboard_entry_id": checkpoint.linked_blackboard_entry_id,
+            "linked_deliberation_record_id": checkpoint.linked_deliberation_record_id,
+            "target_artifact_id": checkpoint.target_artifact_id,
+            "target_artifact_version_id": checkpoint.target_artifact_version_id,
+            "target_decision_id": checkpoint.target_decision_id,
+            "target_creative_input_id": checkpoint.target_creative_input_id,
+            "created_at": checkpoint.created_at,
+            "updated_at": checkpoint.updated_at,
+        }
+    )
+
+
 def _validate_blackboard_targets(
     db: Session,
     *,
@@ -223,6 +249,24 @@ def _validate_blackboard_targets(
         creative_input = _one(db, models.CreativeInput, target_creative_input_id)
         if creative_input.project_id != project.id:
             raise ValidationError("target creative input does not belong to project")
+
+
+def _validate_checkpoint_links(
+    db: Session,
+    *,
+    project: models.Project,
+    linked_blackboard_entry_id: str | None,
+    linked_deliberation_record_id: str | None,
+) -> None:
+    if linked_blackboard_entry_id is not None:
+        entry = _one(db, models.BlackboardEntry, linked_blackboard_entry_id)
+        if entry.project_id != project.id:
+            raise ValidationError("linked blackboard entry does not belong to project")
+
+    if linked_deliberation_record_id is not None:
+        record = _one(db, models.DeliberationRecord, linked_deliberation_record_id)
+        if record.project_id != project.id:
+            raise ValidationError("linked deliberation record does not belong to project")
 
 
 def create_workspace(db: Session, data: schemas.WorkspaceCreate) -> models.Workspace:
@@ -1190,3 +1234,126 @@ def get_specialist_proposal(
     db: Session, proposal_id: str
 ) -> schemas.SpecialistProposalRead:
     return _specialist_proposal_read(_one(db, models.SpecialistProposal, proposal_id))
+
+
+def create_human_checkpoint(
+    db: Session, project_id: str, data: schemas.HumanCheckpointCreate
+) -> schemas.HumanCheckpointRead:
+    project = _one(db, models.Project, project_id)
+    _one(db, models.User, str(data.requested_by_user_id))
+
+    linked_blackboard_entry_id = (
+        str(data.linked_blackboard_entry_id) if data.linked_blackboard_entry_id else None
+    )
+    linked_deliberation_record_id = (
+        str(data.linked_deliberation_record_id) if data.linked_deliberation_record_id else None
+    )
+    target_artifact_id = str(data.target_artifact_id) if data.target_artifact_id else None
+    target_artifact_version_id = (
+        str(data.target_artifact_version_id) if data.target_artifact_version_id else None
+    )
+    target_decision_id = str(data.target_decision_id) if data.target_decision_id else None
+    target_creative_input_id = (
+        str(data.target_creative_input_id) if data.target_creative_input_id else None
+    )
+    _validate_checkpoint_links(
+        db,
+        project=project,
+        linked_blackboard_entry_id=linked_blackboard_entry_id,
+        linked_deliberation_record_id=linked_deliberation_record_id,
+    )
+    _validate_blackboard_targets(
+        db,
+        project=project,
+        target_artifact_id=target_artifact_id,
+        target_artifact_version_id=target_artifact_version_id,
+        target_decision_id=target_decision_id,
+        target_creative_input_id=target_creative_input_id,
+    )
+
+    checkpoint = models.HumanCheckpoint(
+        project_id=project.id,
+        requested_by_user_id=str(data.requested_by_user_id),
+        checkpoint_type=data.checkpoint_type,
+        title=data.title,
+        summary=data.summary,
+        decision_status="pending",
+        linked_blackboard_entry_id=linked_blackboard_entry_id,
+        linked_deliberation_record_id=linked_deliberation_record_id,
+        target_artifact_id=target_artifact_id,
+        target_artifact_version_id=target_artifact_version_id,
+        target_decision_id=target_decision_id,
+        target_creative_input_id=target_creative_input_id,
+    )
+    db.add(checkpoint)
+    db.flush()
+    _audit(
+        db,
+        entity_type="human_checkpoint",
+        entity_id=checkpoint.id,
+        action="created",
+        actor_user_id=checkpoint.requested_by_user_id,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={
+            "checkpoint_type": checkpoint.checkpoint_type,
+            "decision_status": checkpoint.decision_status,
+            "title": checkpoint.title,
+        },
+    )
+    db.commit()
+    db.refresh(checkpoint)
+    return _human_checkpoint_read(checkpoint)
+
+
+def list_project_human_checkpoints(
+    db: Session,
+    project_id: str,
+    checkpoint_type: str | None = None,
+    decision_status: str | None = None,
+) -> list[schemas.HumanCheckpointRead]:
+    _one(db, models.Project, project_id)
+    query = (
+        select(models.HumanCheckpoint)
+        .where(models.HumanCheckpoint.project_id == project_id)
+        .order_by(models.HumanCheckpoint.created_at)
+    )
+    if checkpoint_type is not None:
+        query = query.where(models.HumanCheckpoint.checkpoint_type == checkpoint_type)
+    if decision_status is not None:
+        query = query.where(models.HumanCheckpoint.decision_status == decision_status)
+    return [_human_checkpoint_read(checkpoint) for checkpoint in db.scalars(query).all()]
+
+
+def get_human_checkpoint(db: Session, checkpoint_id: str) -> schemas.HumanCheckpointRead:
+    return _human_checkpoint_read(_one(db, models.HumanCheckpoint, checkpoint_id))
+
+
+def decide_human_checkpoint(
+    db: Session, checkpoint_id: str, data: schemas.HumanCheckpointDecisionUpdate
+) -> schemas.HumanCheckpointRead:
+    checkpoint = _one(db, models.HumanCheckpoint, checkpoint_id)
+    _one(db, models.User, str(data.decided_by_user_id))
+    old_status = checkpoint.decision_status
+    checkpoint.decided_by_user_id = str(data.decided_by_user_id)
+    checkpoint.decision_status = data.decision_status
+    checkpoint.decision_rationale = data.decision_rationale
+    db.flush()
+    project = _one(db, models.Project, checkpoint.project_id)
+    _audit(
+        db,
+        entity_type="human_checkpoint",
+        entity_id=checkpoint.id,
+        action="decided",
+        actor_user_id=checkpoint.decided_by_user_id,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={
+            "checkpoint_type": checkpoint.checkpoint_type,
+            "old_status": old_status,
+            "new_status": checkpoint.decision_status,
+        },
+    )
+    db.commit()
+    db.refresh(checkpoint)
+    return _human_checkpoint_read(checkpoint)

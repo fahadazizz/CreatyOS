@@ -113,9 +113,14 @@ Deliberation record fields:
 - `POST /api/v1/projects/{project_id}/specialist-proposals`
 - `GET /api/v1/projects/{project_id}/specialist-proposals`
 - `GET /api/v1/specialist-proposals/{proposal_id}`
+- `POST /api/v1/projects/{project_id}/human-checkpoints`
+- `GET /api/v1/projects/{project_id}/human-checkpoints`
+- `GET /api/v1/human-checkpoints/{checkpoint_id}`
+- `PATCH /api/v1/human-checkpoints/{checkpoint_id}/decision`
 
 The blackboard list route supports optional filtering by `entry_type` and `status`.
 Specialist proposals support `creative_director`, `story_argument`, `editorial`, `visual_direction`, `sound_direction`, `producer`, and `critic`; each proposal creates a linked blackboard `proposal` entry and has status `submitted`.
+Human checkpoints support `project_thesis`, `creative_route`, `audience_promise`, `final_treatment`, `visual_language`, `production_plan`, `edit_direction`, and `final_release`; decisions require a human user and rationale.
 
 ## Validation Rules
 

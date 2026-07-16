@@ -1,6 +1,6 @@
 # Milestone 2 - Studio Brain v1
 
-**Status:** in progress  
+**Status:** complete
 **Canonical architecture:** `docs/creative_director_os_reference_architecture.md`  
 **Build plan section:** Milestone 2 - Studio Brain v1
 
@@ -71,8 +71,12 @@ Out of scope:
 
 ## Phase 2.4 - Human Checkpoint Protocol
 
-**Status:** not started
+**Status:** implemented
+
+- Stores mandatory human checkpoint records for all planned checkpoint types.
+- Human decisions require accountable user and rationale.
+- Checkpoints are auditable and do not mutate source-of-truth records.
 
 ## Milestone Exit Criteria
 
-Milestone 2 is not complete. Phase 2.1 provides the deterministic blackboard and deliberation record foundation. Remaining work must add specialist proposal infrastructure, deliberation ranking/control behavior, and mandatory human checkpoint protocol before Milestone 2 can be considered complete.
+Milestone 2 is complete for deterministic Studio Brain v1 infrastructure.

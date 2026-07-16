@@ -85,6 +85,8 @@ Phase 2.2 specialist proposal tests verify linked blackboard proposal creation, 
 
 Phase 2.3 deliberation controller tests verify deterministic ranking, recorded deliberation/audit output, empty-project rejection, and no source-of-truth mutation.
 
+Phase 2.4 human checkpoint tests verify checkpoint creation/decision audit, rationale validation, cross-project link rejection, and no source-of-truth mutation.
+
 Run Alembic migrations:
 
 ```bash

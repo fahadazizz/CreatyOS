@@ -61,6 +61,7 @@ class Project(TimestampMixin, Base):
     blackboard_entries: Mapped[list["BlackboardEntry"]] = relationship(back_populates="project")
     deliberation_records: Mapped[list["DeliberationRecord"]] = relationship(back_populates="project")
     specialist_proposals: Mapped[list["SpecialistProposal"]] = relationship(back_populates="project")
+    human_checkpoints: Mapped[list["HumanCheckpoint"]] = relationship(back_populates="project")
 
 
 class Production(TimestampMixin, Base):
@@ -294,3 +295,41 @@ class SpecialistProposal(TimestampMixin, Base):
     )
 
     project: Mapped[Project] = relationship(back_populates="specialist_proposals")
+
+
+class HumanCheckpoint(TimestampMixin, Base):
+    __tablename__ = "human_checkpoints"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    requested_by_user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    decided_by_user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
+    checkpoint_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(240), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    decision_status: Mapped[str] = mapped_column(String(40), nullable=False, default="pending", index=True)
+    decision_rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
+    linked_blackboard_entry_id: Mapped[str | None] = mapped_column(
+        ForeignKey("blackboard_entries.id"), nullable=True, index=True
+    )
+    linked_deliberation_record_id: Mapped[str | None] = mapped_column(
+        ForeignKey("deliberation_records.id"), nullable=True, index=True
+    )
+    target_artifact_id: Mapped[str | None] = mapped_column(
+        ForeignKey("artifacts.id"), nullable=True, index=True
+    )
+    target_artifact_version_id: Mapped[str | None] = mapped_column(
+        ForeignKey("artifact_versions.id"), nullable=True, index=True
+    )
+    target_decision_id: Mapped[str | None] = mapped_column(
+        ForeignKey("decisions.id"), nullable=True, index=True
+    )
+    target_creative_input_id: Mapped[str | None] = mapped_column(
+        ForeignKey("creative_inputs.id"), nullable=True, index=True
+    )
+
+    project: Mapped[Project] = relationship(back_populates="human_checkpoints")
