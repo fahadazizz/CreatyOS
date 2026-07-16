@@ -218,6 +218,53 @@ def _human_checkpoint_read(
     )
 
 
+def _score_branch_read(
+    branch: models.AudiovisualScoreBranch,
+) -> schemas.AudiovisualScoreBranchRead:
+    return schemas.AudiovisualScoreBranchRead.model_validate(
+        {
+            "id": branch.id,
+            "project_id": branch.project_id,
+            "created_by_user_id": branch.created_by_user_id,
+            "name": branch.name,
+            "purpose": branch.purpose,
+            "status": branch.status,
+            "source_artifact_version_id": branch.source_artifact_version_id,
+            "source_decision_id": branch.source_decision_id,
+            "created_at": branch.created_at,
+            "updated_at": branch.updated_at,
+        }
+    )
+
+
+def _score_event_read(
+    event: models.AudiovisualScoreEvent,
+) -> schemas.AudiovisualScoreEventRead:
+    return schemas.AudiovisualScoreEventRead.model_validate(
+        {
+            "id": event.id,
+            "branch_id": event.branch_id,
+            "project_id": event.project_id,
+            "created_by_user_id": event.created_by_user_id,
+            "parent_event_id": event.parent_event_id,
+            "hierarchy_level": event.hierarchy_level,
+            "title": event.title,
+            "sort_key": event.sort_key,
+            "why": event.why,
+            "what": event.what,
+            "how": event.how,
+            "where_when": json.loads(event.where_when_json),
+            "duration_policy": event.duration_policy,
+            "status": event.status,
+            "linked_artifact_version_id": event.linked_artifact_version_id,
+            "linked_decision_id": event.linked_decision_id,
+            "linked_blackboard_entry_id": event.linked_blackboard_entry_id,
+            "created_at": event.created_at,
+            "updated_at": event.updated_at,
+        }
+    )
+
+
 def _validate_blackboard_targets(
     db: Session,
     *,
@@ -267,6 +314,29 @@ def _validate_checkpoint_links(
         record = _one(db, models.DeliberationRecord, linked_deliberation_record_id)
         if record.project_id != project.id:
             raise ValidationError("linked deliberation record does not belong to project")
+
+
+def _validate_score_links(
+    db: Session,
+    *,
+    project: models.Project,
+    artifact_version_id: str | None = None,
+    decision_id: str | None = None,
+    blackboard_entry_id: str | None = None,
+) -> None:
+    if artifact_version_id is not None:
+        version = _one(db, models.ArtifactVersion, artifact_version_id)
+        artifact = _one(db, models.Artifact, version.artifact_id)
+        if artifact.project_id != project.id:
+            raise ValidationError("linked artifact version does not belong to project")
+    if decision_id is not None:
+        decision = _one(db, models.Decision, decision_id)
+        if decision.project_id != project.id:
+            raise ValidationError("linked decision does not belong to project")
+    if blackboard_entry_id is not None:
+        entry = _one(db, models.BlackboardEntry, blackboard_entry_id)
+        if entry.project_id != project.id:
+            raise ValidationError("linked blackboard entry does not belong to project")
 
 
 def create_workspace(db: Session, data: schemas.WorkspaceCreate) -> models.Workspace:
@@ -1430,3 +1500,145 @@ def decide_human_checkpoint(
     db.commit()
     db.refresh(checkpoint)
     return _human_checkpoint_read(checkpoint)
+
+
+def create_score_branch(
+    db: Session, project_id: str, data: schemas.AudiovisualScoreBranchCreate
+) -> schemas.AudiovisualScoreBranchRead:
+    project = _one(db, models.Project, project_id)
+    _one(db, models.User, str(data.created_by_user_id))
+    source_artifact_version_id = (
+        str(data.source_artifact_version_id) if data.source_artifact_version_id else None
+    )
+    source_decision_id = str(data.source_decision_id) if data.source_decision_id else None
+    _validate_score_links(
+        db,
+        project=project,
+        artifact_version_id=source_artifact_version_id,
+        decision_id=source_decision_id,
+    )
+
+    branch = models.AudiovisualScoreBranch(
+        project_id=project.id,
+        created_by_user_id=str(data.created_by_user_id),
+        name=data.name,
+        purpose=data.purpose,
+        status="draft",
+        source_artifact_version_id=source_artifact_version_id,
+        source_decision_id=source_decision_id,
+    )
+    db.add(branch)
+    db.flush()
+    _audit(
+        db,
+        entity_type="audiovisual_score_branch",
+        entity_id=branch.id,
+        action="created",
+        actor_user_id=branch.created_by_user_id,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={"name": branch.name, "status": branch.status},
+    )
+    db.commit()
+    db.refresh(branch)
+    return _score_branch_read(branch)
+
+
+def list_project_score_branches(
+    db: Session, project_id: str
+) -> list[schemas.AudiovisualScoreBranchRead]:
+    _one(db, models.Project, project_id)
+    branches = db.scalars(
+        select(models.AudiovisualScoreBranch)
+        .where(models.AudiovisualScoreBranch.project_id == project_id)
+        .order_by(models.AudiovisualScoreBranch.created_at)
+    ).all()
+    return [_score_branch_read(branch) for branch in branches]
+
+
+def get_score_branch(db: Session, branch_id: str) -> schemas.AudiovisualScoreBranchRead:
+    return _score_branch_read(_one(db, models.AudiovisualScoreBranch, branch_id))
+
+
+def create_score_event(
+    db: Session, branch_id: str, data: schemas.AudiovisualScoreEventCreate
+) -> schemas.AudiovisualScoreEventRead:
+    branch = _one(db, models.AudiovisualScoreBranch, branch_id)
+    project = _one(db, models.Project, branch.project_id)
+    _one(db, models.User, str(data.created_by_user_id))
+
+    parent_event_id = str(data.parent_event_id) if data.parent_event_id else None
+    if parent_event_id is not None:
+        parent = _one(db, models.AudiovisualScoreEvent, parent_event_id)
+        if parent.branch_id != branch.id:
+            raise ValidationError("parent score event does not belong to branch")
+
+    linked_artifact_version_id = (
+        str(data.linked_artifact_version_id) if data.linked_artifact_version_id else None
+    )
+    linked_decision_id = str(data.linked_decision_id) if data.linked_decision_id else None
+    linked_blackboard_entry_id = (
+        str(data.linked_blackboard_entry_id) if data.linked_blackboard_entry_id else None
+    )
+    _validate_score_links(
+        db,
+        project=project,
+        artifact_version_id=linked_artifact_version_id,
+        decision_id=linked_decision_id,
+        blackboard_entry_id=linked_blackboard_entry_id,
+    )
+
+    event = models.AudiovisualScoreEvent(
+        branch_id=branch.id,
+        project_id=project.id,
+        created_by_user_id=str(data.created_by_user_id),
+        parent_event_id=parent_event_id,
+        hierarchy_level=data.hierarchy_level,
+        title=data.title,
+        sort_key=data.sort_key,
+        why=data.why,
+        what=data.what,
+        how=data.how,
+        where_when_json=json.dumps(data.where_when.model_dump(), sort_keys=True),
+        duration_policy=data.duration_policy,
+        status=data.status,
+        linked_artifact_version_id=linked_artifact_version_id,
+        linked_decision_id=linked_decision_id,
+        linked_blackboard_entry_id=linked_blackboard_entry_id,
+    )
+    db.add(event)
+    db.flush()
+    _audit(
+        db,
+        entity_type="audiovisual_score_event",
+        entity_id=event.id,
+        action="created",
+        actor_user_id=event.created_by_user_id,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={
+            "branch_id": event.branch_id,
+            "hierarchy_level": event.hierarchy_level,
+            "title": event.title,
+            "status": event.status,
+        },
+    )
+    db.commit()
+    db.refresh(event)
+    return _score_event_read(event)
+
+
+def list_score_events(
+    db: Session, branch_id: str
+) -> list[schemas.AudiovisualScoreEventRead]:
+    _one(db, models.AudiovisualScoreBranch, branch_id)
+    events = db.scalars(
+        select(models.AudiovisualScoreEvent)
+        .where(models.AudiovisualScoreEvent.branch_id == branch_id)
+        .order_by(models.AudiovisualScoreEvent.sort_key)
+    ).all()
+    return [_score_event_read(event) for event in events]
+
+
+def get_score_event(db: Session, event_id: str) -> schemas.AudiovisualScoreEventRead:
+    return _score_event_read(_one(db, models.AudiovisualScoreEvent, event_id))

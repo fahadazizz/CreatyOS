@@ -411,6 +411,19 @@ HumanCheckpointType = Literal[
     "final_release",
 ]
 HumanCheckpointStatus = Literal["pending", "approved", "revision_requested", "blocked"]
+ScoreBranchStatus = Literal["draft", "active", "superseded"]
+ScoreHierarchyLevel = Literal[
+    "piece",
+    "act",
+    "sequence",
+    "scene",
+    "beat",
+    "shot",
+    "event",
+    "cut",
+]
+ScoreEventStatus = Literal["planned", "needs_proof", "approved", "superseded"]
+ScoreDurationPolicy = Literal["elastic", "fixed", "relative"]
 
 
 BLACKBOARD_PAYLOAD_REQUIREMENTS: dict[BlackboardEntryType, tuple[str, ...]] = {
@@ -679,3 +692,84 @@ class HumanCheckpointReadinessRead(BaseModel):
     blocked_checkpoint_types: list[HumanCheckpointType]
     revision_requested_checkpoint_types: list[HumanCheckpointType]
     items: list[HumanCheckpointReadinessItem]
+
+
+class ScoreWhereWhen(BaseModel):
+    placement: str = Field(min_length=1, max_length=1000)
+    timing: str = Field(min_length=1, max_length=1000)
+    duration: str = Field(min_length=1, max_length=1000)
+    dependency: str = Field(min_length=1, max_length=1000)
+
+    _placement = field_validator("placement")(_strip_nonempty)
+    _timing = field_validator("timing")(_strip_nonempty)
+    _duration = field_validator("duration")(_strip_nonempty)
+    _dependency = field_validator("dependency")(_strip_nonempty)
+
+
+class AudiovisualScoreBranchCreate(BaseModel):
+    created_by_user_id: UUID
+    name: str = Field(min_length=1, max_length=240)
+    purpose: str = Field(min_length=1, max_length=4000)
+    source_artifact_version_id: UUID | None = None
+    source_decision_id: UUID | None = None
+
+    _name = field_validator("name")(_strip_nonempty)
+    _purpose = field_validator("purpose")(_strip_nonempty)
+
+
+class AudiovisualScoreBranchRead(OrmModel):
+    id: UUID
+    project_id: UUID
+    created_by_user_id: UUID
+    name: str
+    purpose: str
+    status: str
+    source_artifact_version_id: UUID | None
+    source_decision_id: UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AudiovisualScoreEventCreate(BaseModel):
+    created_by_user_id: UUID
+    hierarchy_level: ScoreHierarchyLevel
+    title: str = Field(min_length=1, max_length=240)
+    sort_key: str = Field(min_length=1, max_length=120)
+    why: str = Field(min_length=1, max_length=4000)
+    what: str = Field(min_length=1, max_length=4000)
+    how: str = Field(min_length=1, max_length=4000)
+    where_when: ScoreWhereWhen
+    duration_policy: ScoreDurationPolicy
+    status: ScoreEventStatus = "planned"
+    parent_event_id: UUID | None = None
+    linked_artifact_version_id: UUID | None = None
+    linked_decision_id: UUID | None = None
+    linked_blackboard_entry_id: UUID | None = None
+
+    _title = field_validator("title")(_strip_nonempty)
+    _sort_key = field_validator("sort_key")(_strip_nonempty)
+    _why = field_validator("why")(_strip_nonempty)
+    _what = field_validator("what")(_strip_nonempty)
+    _how = field_validator("how")(_strip_nonempty)
+
+
+class AudiovisualScoreEventRead(OrmModel):
+    id: UUID
+    branch_id: UUID
+    project_id: UUID
+    created_by_user_id: UUID
+    parent_event_id: UUID | None
+    hierarchy_level: str
+    title: str
+    sort_key: str
+    why: str
+    what: str
+    how: str
+    where_when: ScoreWhereWhen
+    duration_policy: str
+    status: str
+    linked_artifact_version_id: UUID | None
+    linked_decision_id: UUID | None
+    linked_blackboard_entry_id: UUID | None
+    created_at: datetime
+    updated_at: datetime

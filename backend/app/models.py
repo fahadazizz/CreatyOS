@@ -62,6 +62,9 @@ class Project(TimestampMixin, Base):
     deliberation_records: Mapped[list["DeliberationRecord"]] = relationship(back_populates="project")
     specialist_proposals: Mapped[list["SpecialistProposal"]] = relationship(back_populates="project")
     human_checkpoints: Mapped[list["HumanCheckpoint"]] = relationship(back_populates="project")
+    audiovisual_score_branches: Mapped[list["AudiovisualScoreBranch"]] = relationship(
+        back_populates="project"
+    )
 
 
 class Production(TimestampMixin, Base):
@@ -333,3 +336,59 @@ class HumanCheckpoint(TimestampMixin, Base):
     )
 
     project: Mapped[Project] = relationship(back_populates="human_checkpoints")
+
+
+class AudiovisualScoreBranch(TimestampMixin, Base):
+    __tablename__ = "audiovisual_score_branches"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    created_by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(240), nullable=False)
+    purpose: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="draft", index=True)
+    source_artifact_version_id: Mapped[str | None] = mapped_column(
+        ForeignKey("artifact_versions.id"), nullable=True, index=True
+    )
+    source_decision_id: Mapped[str | None] = mapped_column(
+        ForeignKey("decisions.id"), nullable=True, index=True
+    )
+
+    project: Mapped[Project] = relationship(back_populates="audiovisual_score_branches")
+    events: Mapped[list["AudiovisualScoreEvent"]] = relationship(
+        back_populates="branch", order_by="AudiovisualScoreEvent.sort_key"
+    )
+
+
+class AudiovisualScoreEvent(TimestampMixin, Base):
+    __tablename__ = "audiovisual_score_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    branch_id: Mapped[str] = mapped_column(
+        ForeignKey("audiovisual_score_branches.id"), nullable=False, index=True
+    )
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    created_by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    parent_event_id: Mapped[str | None] = mapped_column(
+        ForeignKey("audiovisual_score_events.id"), nullable=True, index=True
+    )
+    hierarchy_level: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(240), nullable=False)
+    sort_key: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    why: Mapped[str] = mapped_column(Text, nullable=False)
+    what: Mapped[str] = mapped_column(Text, nullable=False)
+    how: Mapped[str] = mapped_column(Text, nullable=False)
+    where_when_json: Mapped[str] = mapped_column(Text, nullable=False)
+    duration_policy: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="planned", index=True)
+    linked_artifact_version_id: Mapped[str | None] = mapped_column(
+        ForeignKey("artifact_versions.id"), nullable=True, index=True
+    )
+    linked_decision_id: Mapped[str | None] = mapped_column(
+        ForeignKey("decisions.id"), nullable=True, index=True
+    )
+    linked_blackboard_entry_id: Mapped[str | None] = mapped_column(
+        ForeignKey("blackboard_entries.id"), nullable=True, index=True
+    )
+
+    branch: Mapped[AudiovisualScoreBranch] = relationship(back_populates="events")

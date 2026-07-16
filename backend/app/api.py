@@ -462,3 +462,79 @@ async def decide_human_checkpoint(
         return services.decide_human_checkpoint(db, str(checkpoint_id), payload)
     except Exception as exc:
         _handle_error(exc)
+
+
+@router.post(
+    "/projects/{project_id}/score-branches",
+    response_model=schemas.AudiovisualScoreBranchRead,
+    status_code=201,
+)
+async def create_score_branch(
+    project_id: UUID,
+    payload: schemas.AudiovisualScoreBranchCreate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.create_score_branch(db, str(project_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/projects/{project_id}/score-branches",
+    response_model=list[schemas.AudiovisualScoreBranchRead],
+)
+async def list_project_score_branches(project_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.list_project_score_branches(db, str(project_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/score-branches/{branch_id}",
+    response_model=schemas.AudiovisualScoreBranchRead,
+)
+async def get_score_branch(branch_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.get_score_branch(db, str(branch_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.post(
+    "/score-branches/{branch_id}/events",
+    response_model=schemas.AudiovisualScoreEventRead,
+    status_code=201,
+)
+async def create_score_event(
+    branch_id: UUID,
+    payload: schemas.AudiovisualScoreEventCreate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.create_score_event(db, str(branch_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/score-branches/{branch_id}/events",
+    response_model=list[schemas.AudiovisualScoreEventRead],
+)
+async def list_score_events(branch_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.list_score_events(db, str(branch_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/score-events/{event_id}",
+    response_model=schemas.AudiovisualScoreEventRead,
+)
+async def get_score_event(event_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.get_score_event(db, str(event_id))
+    except Exception as exc:
+        _handle_error(exc)
