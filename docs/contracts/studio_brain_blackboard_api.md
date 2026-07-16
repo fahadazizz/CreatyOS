@@ -109,8 +109,12 @@ Deliberation record fields:
 - `POST /api/v1/projects/{project_id}/deliberations`
 - `GET /api/v1/projects/{project_id}/deliberations`
 - `GET /api/v1/deliberations/{deliberation_id}`
+- `POST /api/v1/projects/{project_id}/specialist-proposals`
+- `GET /api/v1/projects/{project_id}/specialist-proposals`
+- `GET /api/v1/specialist-proposals/{proposal_id}`
 
 The blackboard list route supports optional filtering by `entry_type` and `status`.
+Specialist proposals support `creative_director`, `story_argument`, `editorial`, `visual_direction`, `sound_direction`, `producer`, and `critic`; each proposal creates a linked blackboard `proposal` entry and has status `submitted`.
 
 ## Validation Rules
 

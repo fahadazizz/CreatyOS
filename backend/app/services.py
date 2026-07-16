@@ -161,6 +161,37 @@ def _deliberation_record_read(
     )
 
 
+def _specialist_proposal_read(
+    proposal: models.SpecialistProposal,
+) -> schemas.SpecialistProposalRead:
+    return schemas.SpecialistProposalRead.model_validate(
+        {
+            "id": proposal.id,
+            "project_id": proposal.project_id,
+            "submitted_by_user_id": proposal.submitted_by_user_id,
+            "blackboard_entry_id": proposal.blackboard_entry_id,
+            "specialist_type": proposal.specialist_type,
+            "proposal_kind": proposal.proposal_kind,
+            "title": proposal.title,
+            "problem_statement": proposal.problem_statement,
+            "recommendation": proposal.recommendation,
+            "rationale": proposal.rationale,
+            "expected_impact": proposal.expected_impact,
+            "confidence_level": proposal.confidence_level,
+            "severity": proposal.severity,
+            "evidence": json.loads(proposal.evidence_json),
+            "risks": json.loads(proposal.risks_json),
+            "status": proposal.status,
+            "target_artifact_id": proposal.target_artifact_id,
+            "target_artifact_version_id": proposal.target_artifact_version_id,
+            "target_decision_id": proposal.target_decision_id,
+            "target_creative_input_id": proposal.target_creative_input_id,
+            "created_at": proposal.created_at,
+            "updated_at": proposal.updated_at,
+        }
+    )
+
+
 def _validate_blackboard_targets(
     db: Session,
     *,
@@ -857,3 +888,134 @@ def get_deliberation_record(
     db: Session, deliberation_id: str
 ) -> schemas.DeliberationRecordRead:
     return _deliberation_record_read(_one(db, models.DeliberationRecord, deliberation_id))
+
+
+def create_specialist_proposal(
+    db: Session, project_id: str, data: schemas.SpecialistProposalCreate
+) -> schemas.SpecialistProposalRead:
+    project = _one(db, models.Project, project_id)
+    _one(db, models.User, str(data.submitted_by_user_id))
+
+    target_artifact_id = str(data.target_artifact_id) if data.target_artifact_id else None
+    target_artifact_version_id = (
+        str(data.target_artifact_version_id) if data.target_artifact_version_id else None
+    )
+    target_decision_id = str(data.target_decision_id) if data.target_decision_id else None
+    target_creative_input_id = (
+        str(data.target_creative_input_id) if data.target_creative_input_id else None
+    )
+    _validate_blackboard_targets(
+        db,
+        project=project,
+        target_artifact_id=target_artifact_id,
+        target_artifact_version_id=target_artifact_version_id,
+        target_decision_id=target_decision_id,
+        target_creative_input_id=target_creative_input_id,
+    )
+
+    blackboard_payload = {
+        "proposal_type": data.proposal_kind,
+        "specialist_type": data.specialist_type,
+        "problem_statement": data.problem_statement,
+        "recommended_action": data.recommendation,
+        "expected_impact": data.expected_impact,
+        "evidence": data.evidence,
+        "risks": data.risks,
+    }
+    entry = models.BlackboardEntry(
+        project_id=project.id,
+        author_user_id=str(data.submitted_by_user_id),
+        entry_type="proposal",
+        title=data.title,
+        summary=data.problem_statement,
+        rationale=data.rationale,
+        confidence_level=data.confidence_level,
+        severity=data.severity,
+        status="open",
+        payload_json=json.dumps(blackboard_payload, sort_keys=True),
+        target_artifact_id=target_artifact_id,
+        target_artifact_version_id=target_artifact_version_id,
+        target_decision_id=target_decision_id,
+        target_creative_input_id=target_creative_input_id,
+    )
+    db.add(entry)
+    db.flush()
+
+    proposal = models.SpecialistProposal(
+        project_id=project.id,
+        submitted_by_user_id=str(data.submitted_by_user_id),
+        blackboard_entry_id=entry.id,
+        specialist_type=data.specialist_type,
+        proposal_kind=data.proposal_kind,
+        title=data.title,
+        problem_statement=data.problem_statement,
+        recommendation=data.recommendation,
+        rationale=data.rationale,
+        expected_impact=data.expected_impact,
+        confidence_level=data.confidence_level,
+        severity=data.severity,
+        evidence_json=json.dumps(data.evidence),
+        risks_json=json.dumps(data.risks),
+        status="submitted",
+        target_artifact_id=target_artifact_id,
+        target_artifact_version_id=target_artifact_version_id,
+        target_decision_id=target_decision_id,
+        target_creative_input_id=target_creative_input_id,
+    )
+    db.add(proposal)
+    db.flush()
+    _audit(
+        db,
+        entity_type="blackboard_entry",
+        entity_id=entry.id,
+        action="created",
+        actor_user_id=entry.author_user_id,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={
+            "entry_type": entry.entry_type,
+            "title": entry.title,
+            "status": entry.status,
+            "severity": entry.severity,
+            "source": "specialist_proposal",
+        },
+    )
+    _audit(
+        db,
+        entity_type="specialist_proposal",
+        entity_id=proposal.id,
+        action="submitted",
+        actor_user_id=proposal.submitted_by_user_id,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={
+            "specialist_type": proposal.specialist_type,
+            "proposal_kind": proposal.proposal_kind,
+            "blackboard_entry_id": proposal.blackboard_entry_id,
+        },
+    )
+    db.commit()
+    db.refresh(proposal)
+    return _specialist_proposal_read(proposal)
+
+
+def list_project_specialist_proposals(
+    db: Session,
+    project_id: str,
+    specialist_type: str | None = None,
+) -> list[schemas.SpecialistProposalRead]:
+    _one(db, models.Project, project_id)
+    query = (
+        select(models.SpecialistProposal)
+        .where(models.SpecialistProposal.project_id == project_id)
+        .order_by(models.SpecialistProposal.created_at)
+    )
+    if specialist_type is not None:
+        query = query.where(models.SpecialistProposal.specialist_type == specialist_type)
+    return [_specialist_proposal_read(proposal) for proposal in db.scalars(query).all()]
+
+
+def get_specialist_proposal(
+    db: Session, proposal_id: str
+) -> schemas.SpecialistProposalRead:
+    return _specialist_proposal_read(_one(db, models.SpecialistProposal, proposal_id))

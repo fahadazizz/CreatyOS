@@ -379,6 +379,27 @@ DeliberationPhase = Literal[
     "reopen",
 ]
 DeliberationStatus = Literal["open", "recorded", "superseded"]
+SpecialistType = Literal[
+    "creative_director",
+    "story_argument",
+    "editorial",
+    "visual_direction",
+    "sound_direction",
+    "producer",
+    "critic",
+]
+SpecialistProposalKind = Literal[
+    "creative_route",
+    "story_argument",
+    "editorial_action",
+    "visual_direction",
+    "sound_direction",
+    "production_action",
+    "critique",
+    "proof_request",
+    "risk_response",
+]
+SpecialistProposalStatus = Literal["submitted"]
 
 
 BLACKBOARD_PAYLOAD_REQUIREMENTS: dict[BlackboardEntryType, tuple[str, ...]] = {
@@ -499,5 +520,66 @@ class DeliberationRecordRead(OrmModel):
     rationale: str
     result: dict[str, Any]
     status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class SpecialistProposalCreate(BaseModel):
+    submitted_by_user_id: UUID
+    specialist_type: SpecialistType
+    proposal_kind: SpecialistProposalKind
+    title: str = Field(min_length=1, max_length=240)
+    problem_statement: str = Field(min_length=1, max_length=4000)
+    recommendation: str = Field(min_length=1, max_length=4000)
+    rationale: str = Field(min_length=1, max_length=4000)
+    expected_impact: str = Field(min_length=1, max_length=4000)
+    confidence_level: ConfidenceLevel
+    severity: BlackboardSeverity
+    evidence: list[str] = Field(default_factory=list, max_length=100)
+    risks: list[str] = Field(default_factory=list, max_length=100)
+    target_artifact_id: UUID | None = None
+    target_artifact_version_id: UUID | None = None
+    target_decision_id: UUID | None = None
+    target_creative_input_id: UUID | None = None
+
+    _title = field_validator("title")(_strip_nonempty)
+    _problem_statement = field_validator("problem_statement")(_strip_nonempty)
+    _recommendation = field_validator("recommendation")(_strip_nonempty)
+    _rationale = field_validator("rationale")(_strip_nonempty)
+    _expected_impact = field_validator("expected_impact")(_strip_nonempty)
+
+    @field_validator("evidence", "risks")
+    @classmethod
+    def validate_string_items(cls, value: list[str]) -> list[str]:
+        cleaned = []
+        for item in value:
+            stripped = item.strip()
+            if not stripped:
+                raise ValueError("list items must not be empty")
+            cleaned.append(stripped)
+        return cleaned
+
+
+class SpecialistProposalRead(OrmModel):
+    id: UUID
+    project_id: UUID
+    submitted_by_user_id: UUID
+    blackboard_entry_id: UUID
+    specialist_type: str
+    proposal_kind: str
+    title: str
+    problem_statement: str
+    recommendation: str
+    rationale: str
+    expected_impact: str
+    confidence_level: str
+    severity: str
+    evidence: list[str]
+    risks: list[str]
+    status: str
+    target_artifact_id: UUID | None
+    target_artifact_version_id: UUID | None
+    target_decision_id: UUID | None
+    target_creative_input_id: UUID | None
     created_at: datetime
     updated_at: datetime

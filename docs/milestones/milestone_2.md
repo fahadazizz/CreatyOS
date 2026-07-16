@@ -54,7 +54,12 @@ Out of scope:
 
 ## Phase 2.2 - Specialist Proposal Agents
 
-**Status:** not started
+**Status:** implemented
+
+- Supports deterministic specialist proposal submission for the seven planned specialist roles.
+- Each proposal creates a linked blackboard `proposal` entry.
+- Proposals are listable/filterable and audited.
+- No proposal mutates source-of-truth records or runs a model.
 
 ## Phase 2.3 - Deliberation Controller
 

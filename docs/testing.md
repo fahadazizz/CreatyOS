@@ -81,6 +81,8 @@ Phase 2.1 Studio Brain blackboard tests verify:
 - cross-project deliberation links are rejected;
 - blackboard and deliberation writes do not mutate artifacts or decisions.
 
+Phase 2.2 specialist proposal tests verify linked blackboard proposal creation, supported specialist validation, cross-project target rejection, audit events, and no source-of-truth mutation.
+
 Run Alembic migrations:
 
 ```bash

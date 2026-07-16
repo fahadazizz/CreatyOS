@@ -60,6 +60,7 @@ class Project(TimestampMixin, Base):
     creative_inputs: Mapped[list["CreativeInput"]] = relationship(back_populates="project")
     blackboard_entries: Mapped[list["BlackboardEntry"]] = relationship(back_populates="project")
     deliberation_records: Mapped[list["DeliberationRecord"]] = relationship(back_populates="project")
+    specialist_proposals: Mapped[list["SpecialistProposal"]] = relationship(back_populates="project")
 
 
 class Production(TimestampMixin, Base):
@@ -254,3 +255,42 @@ class DeliberationRecord(TimestampMixin, Base):
     result_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
 
     project: Mapped[Project] = relationship(back_populates="deliberation_records")
+
+
+class SpecialistProposal(TimestampMixin, Base):
+    __tablename__ = "specialist_proposals"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    submitted_by_user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    blackboard_entry_id: Mapped[str] = mapped_column(
+        ForeignKey("blackboard_entries.id"), nullable=False, unique=True, index=True
+    )
+    specialist_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    proposal_kind: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(240), nullable=False)
+    problem_statement: Mapped[str] = mapped_column(Text, nullable=False)
+    recommendation: Mapped[str] = mapped_column(Text, nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    expected_impact: Mapped[str] = mapped_column(Text, nullable=False)
+    confidence_level: Mapped[str] = mapped_column(String(40), nullable=False)
+    severity: Mapped[str] = mapped_column(String(40), nullable=False)
+    evidence_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    risks_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="submitted", index=True)
+    target_artifact_id: Mapped[str | None] = mapped_column(
+        ForeignKey("artifacts.id"), nullable=True, index=True
+    )
+    target_artifact_version_id: Mapped[str | None] = mapped_column(
+        ForeignKey("artifact_versions.id"), nullable=True, index=True
+    )
+    target_decision_id: Mapped[str | None] = mapped_column(
+        ForeignKey("decisions.id"), nullable=True, index=True
+    )
+    target_creative_input_id: Mapped[str | None] = mapped_column(
+        ForeignKey("creative_inputs.id"), nullable=True, index=True
+    )
+
+    project: Mapped[Project] = relationship(back_populates="specialist_proposals")

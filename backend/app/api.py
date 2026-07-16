@@ -329,3 +329,47 @@ async def get_deliberation_record(deliberation_id: UUID, db: Session = Depends(g
         return services.get_deliberation_record(db, str(deliberation_id))
     except Exception as exc:
         _handle_error(exc)
+
+
+@router.post(
+    "/projects/{project_id}/specialist-proposals",
+    response_model=schemas.SpecialistProposalRead,
+    status_code=201,
+)
+async def create_specialist_proposal(
+    project_id: UUID,
+    payload: schemas.SpecialistProposalCreate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.create_specialist_proposal(db, str(project_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/projects/{project_id}/specialist-proposals",
+    response_model=list[schemas.SpecialistProposalRead],
+)
+async def list_project_specialist_proposals(
+    project_id: UUID,
+    specialist_type: schemas.SpecialistType | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.list_project_specialist_proposals(
+            db, str(project_id), specialist_type=specialist_type
+        )
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/specialist-proposals/{proposal_id}",
+    response_model=schemas.SpecialistProposalRead,
+)
+async def get_specialist_proposal(proposal_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.get_specialist_proposal(db, str(proposal_id))
+    except Exception as exc:
+        _handle_error(exc)
