@@ -58,6 +58,8 @@ class Project(TimestampMixin, Base):
     artifacts: Mapped[list["Artifact"]] = relationship(back_populates="project")
     decisions: Mapped[list["Decision"]] = relationship(back_populates="project")
     creative_inputs: Mapped[list["CreativeInput"]] = relationship(back_populates="project")
+    blackboard_entries: Mapped[list["BlackboardEntry"]] = relationship(back_populates="project")
+    deliberation_records: Mapped[list["DeliberationRecord"]] = relationship(back_populates="project")
 
 
 class Production(TimestampMixin, Base):
@@ -204,3 +206,51 @@ class CreativeInput(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     project: Mapped[Project] = relationship(back_populates="creative_inputs")
+
+
+class BlackboardEntry(TimestampMixin, Base):
+    __tablename__ = "blackboard_entries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    author_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    entry_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(240), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    confidence_level: Mapped[str] = mapped_column(String(40), nullable=False)
+    severity: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="open", index=True)
+    payload_json: Mapped[str] = mapped_column(Text, nullable=False)
+    target_artifact_id: Mapped[str | None] = mapped_column(
+        ForeignKey("artifacts.id"), nullable=True, index=True
+    )
+    target_artifact_version_id: Mapped[str | None] = mapped_column(
+        ForeignKey("artifact_versions.id"), nullable=True, index=True
+    )
+    target_decision_id: Mapped[str | None] = mapped_column(
+        ForeignKey("decisions.id"), nullable=True, index=True
+    )
+    target_creative_input_id: Mapped[str | None] = mapped_column(
+        ForeignKey("creative_inputs.id"), nullable=True, index=True
+    )
+
+    project: Mapped[Project] = relationship(back_populates="blackboard_entries")
+
+
+class DeliberationRecord(TimestampMixin, Base):
+    __tablename__ = "deliberation_records"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    created_by_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    phase: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    recommended_next_action: Mapped[str] = mapped_column(Text, nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="open", index=True)
+    priority_inputs_json: Mapped[str] = mapped_column(Text, nullable=False)
+    linked_entry_ids_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    result_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+
+    project: Mapped[Project] = relationship(back_populates="deliberation_records")

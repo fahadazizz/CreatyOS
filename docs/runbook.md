@@ -106,3 +106,19 @@ List candidate creative inputs:
 ```bash
 curl http://localhost:8000/api/v1/projects/{project_id}/creative-inputs
 ```
+
+Create a blackboard proof request:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/projects/{project_id}/blackboard-entries \
+  -H "Content-Type: application/json" \
+  -d '{"author_user_id":"{user_id}","entry_type":"proof_request","title":"Need visual proof before production","summary":"The visual language is still an assumption.","rationale":"A production plan would be premature without checking the route.","confidence_level":"medium","severity":"high","payload":{"proof_type":"visual_language_test","question":"Can restrained product motion carry the thesis?","acceptance_test":"Reviewers can state the intended product feeling without narration.","cheapest_useful_proof":"Three still frames plus a 10 second motion sketch."}}'
+```
+
+Create a deliberation record:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/projects/{project_id}/deliberations \
+  -H "Content-Type: application/json" \
+  -d '{"created_by_user_id":"{user_id}","phase":"decide","question":"What is the cheapest useful next proof?","priority_inputs":{"creative_impact":5,"uncertainty":4,"irreversibility":4,"cost_of_delay":3,"proof_cost":2,"dependency_blockage":5},"linked_entry_ids":["{blackboard_entry_id}"],"recommended_next_action":"Run the visual language proof before accepting treatment changes.","rationale":"The route has high downstream impact and a low-cost proof exists."}'
+```

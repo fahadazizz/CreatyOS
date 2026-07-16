@@ -69,6 +69,18 @@ Phase 1.4 creative input tests verify:
 - non-empty body validation;
 - creative input audit events.
 
+## Milestone 2 Backend Checks
+
+Phase 2.1 Studio Brain blackboard tests verify:
+
+- blackboard entry creation, listing, get, and filtering;
+- type-specific payload validation for structured working memory;
+- project-scoped validation for artifact targets;
+- blackboard status updates and audit events;
+- deliberation record creation with priority inputs and linked entries;
+- cross-project deliberation links are rejected;
+- blackboard and deliberation writes do not mutate artifacts or decisions.
+
 Run Alembic migrations:
 
 ```bash

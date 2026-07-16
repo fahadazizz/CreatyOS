@@ -237,3 +237,95 @@ async def get_creative_input(creative_input_id: UUID, db: Session = Depends(get_
         return services.get_creative_input(db, str(creative_input_id))
     except Exception as exc:
         _handle_error(exc)
+
+
+@router.post(
+    "/projects/{project_id}/blackboard-entries",
+    response_model=schemas.BlackboardEntryRead,
+    status_code=201,
+)
+async def create_blackboard_entry(
+    project_id: UUID, payload: schemas.BlackboardEntryCreate, db: Session = Depends(get_db)
+):
+    try:
+        return services.create_blackboard_entry(db, str(project_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/projects/{project_id}/blackboard-entries",
+    response_model=list[schemas.BlackboardEntryRead],
+)
+async def list_project_blackboard_entries(
+    project_id: UUID,
+    entry_type: schemas.BlackboardEntryType | None = Query(default=None),
+    status: schemas.BlackboardEntryStatus | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.list_project_blackboard_entries(
+            db, str(project_id), entry_type=entry_type, status=status
+        )
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get("/blackboard-entries/{entry_id}", response_model=schemas.BlackboardEntryRead)
+async def get_blackboard_entry(entry_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.get_blackboard_entry(db, str(entry_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.patch(
+    "/blackboard-entries/{entry_id}/status",
+    response_model=schemas.BlackboardEntryRead,
+)
+async def update_blackboard_entry_status(
+    entry_id: UUID,
+    payload: schemas.BlackboardEntryStatusUpdate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.update_blackboard_entry_status(db, str(entry_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.post(
+    "/projects/{project_id}/deliberations",
+    response_model=schemas.DeliberationRecordRead,
+    status_code=201,
+)
+async def create_deliberation_record(
+    project_id: UUID,
+    payload: schemas.DeliberationRecordCreate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.create_deliberation_record(db, str(project_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get(
+    "/projects/{project_id}/deliberations",
+    response_model=list[schemas.DeliberationRecordRead],
+)
+async def list_project_deliberation_records(
+    project_id: UUID, db: Session = Depends(get_db)
+):
+    try:
+        return services.list_project_deliberation_records(db, str(project_id))
+    except Exception as exc:
+        _handle_error(exc)
+
+
+@router.get("/deliberations/{deliberation_id}", response_model=schemas.DeliberationRecordRead)
+async def get_deliberation_record(deliberation_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.get_deliberation_record(db, str(deliberation_id))
+    except Exception as exc:
+        _handle_error(exc)

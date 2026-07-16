@@ -115,6 +115,85 @@ def _creative_input_read(creative_input: models.CreativeInput) -> schemas.Creati
     )
 
 
+def _blackboard_entry_read(entry: models.BlackboardEntry) -> schemas.BlackboardEntryRead:
+    return schemas.BlackboardEntryRead.model_validate(
+        {
+            "id": entry.id,
+            "project_id": entry.project_id,
+            "author_user_id": entry.author_user_id,
+            "entry_type": entry.entry_type,
+            "title": entry.title,
+            "summary": entry.summary,
+            "rationale": entry.rationale,
+            "confidence_level": entry.confidence_level,
+            "severity": entry.severity,
+            "status": entry.status,
+            "payload": json.loads(entry.payload_json),
+            "target_artifact_id": entry.target_artifact_id,
+            "target_artifact_version_id": entry.target_artifact_version_id,
+            "target_decision_id": entry.target_decision_id,
+            "target_creative_input_id": entry.target_creative_input_id,
+            "created_at": entry.created_at,
+            "updated_at": entry.updated_at,
+        }
+    )
+
+
+def _deliberation_record_read(
+    record: models.DeliberationRecord,
+) -> schemas.DeliberationRecordRead:
+    return schemas.DeliberationRecordRead.model_validate(
+        {
+            "id": record.id,
+            "project_id": record.project_id,
+            "created_by_user_id": record.created_by_user_id,
+            "phase": record.phase,
+            "question": record.question,
+            "priority_inputs": json.loads(record.priority_inputs_json),
+            "linked_entry_ids": json.loads(record.linked_entry_ids_json),
+            "recommended_next_action": record.recommended_next_action,
+            "rationale": record.rationale,
+            "result": json.loads(record.result_json),
+            "status": record.status,
+            "created_at": record.created_at,
+            "updated_at": record.updated_at,
+        }
+    )
+
+
+def _validate_blackboard_targets(
+    db: Session,
+    *,
+    project: models.Project,
+    target_artifact_id: str | None,
+    target_artifact_version_id: str | None,
+    target_decision_id: str | None,
+    target_creative_input_id: str | None,
+) -> None:
+    if target_artifact_id is not None:
+        artifact = _one(db, models.Artifact, target_artifact_id)
+        if artifact.project_id != project.id:
+            raise ValidationError("target artifact does not belong to project")
+
+    if target_artifact_version_id is not None:
+        artifact_version = _one(db, models.ArtifactVersion, target_artifact_version_id)
+        version_artifact = _one(db, models.Artifact, artifact_version.artifact_id)
+        if version_artifact.project_id != project.id:
+            raise ValidationError("target artifact version does not belong to project")
+        if target_artifact_id is not None and artifact_version.artifact_id != target_artifact_id:
+            raise ValidationError("target artifact version does not belong to target artifact")
+
+    if target_decision_id is not None:
+        decision = _one(db, models.Decision, target_decision_id)
+        if decision.project_id != project.id:
+            raise ValidationError("target decision does not belong to project")
+
+    if target_creative_input_id is not None:
+        creative_input = _one(db, models.CreativeInput, target_creative_input_id)
+        if creative_input.project_id != project.id:
+            raise ValidationError("target creative input does not belong to project")
+
+
 def create_workspace(db: Session, data: schemas.WorkspaceCreate) -> models.Workspace:
     workspace = models.Workspace(name=data.name, slug=data.slug)
     db.add(workspace)
@@ -608,3 +687,173 @@ def list_project_creative_inputs(
 
 def get_creative_input(db: Session, creative_input_id: str) -> schemas.CreativeInputRead:
     return _creative_input_read(_one(db, models.CreativeInput, creative_input_id))
+
+
+def create_blackboard_entry(
+    db: Session, project_id: str, data: schemas.BlackboardEntryCreate
+) -> schemas.BlackboardEntryRead:
+    project = _one(db, models.Project, project_id)
+    _one(db, models.User, str(data.author_user_id))
+
+    target_artifact_id = str(data.target_artifact_id) if data.target_artifact_id else None
+    target_artifact_version_id = (
+        str(data.target_artifact_version_id) if data.target_artifact_version_id else None
+    )
+    target_decision_id = str(data.target_decision_id) if data.target_decision_id else None
+    target_creative_input_id = (
+        str(data.target_creative_input_id) if data.target_creative_input_id else None
+    )
+    _validate_blackboard_targets(
+        db,
+        project=project,
+        target_artifact_id=target_artifact_id,
+        target_artifact_version_id=target_artifact_version_id,
+        target_decision_id=target_decision_id,
+        target_creative_input_id=target_creative_input_id,
+    )
+
+    entry = models.BlackboardEntry(
+        project_id=project.id,
+        author_user_id=str(data.author_user_id),
+        entry_type=data.entry_type,
+        title=data.title,
+        summary=data.summary,
+        rationale=data.rationale,
+        confidence_level=data.confidence_level,
+        severity=data.severity,
+        status="open",
+        payload_json=json.dumps(data.payload, sort_keys=True),
+        target_artifact_id=target_artifact_id,
+        target_artifact_version_id=target_artifact_version_id,
+        target_decision_id=target_decision_id,
+        target_creative_input_id=target_creative_input_id,
+    )
+    db.add(entry)
+    db.flush()
+    _audit(
+        db,
+        entity_type="blackboard_entry",
+        entity_id=entry.id,
+        action="created",
+        actor_user_id=entry.author_user_id,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={
+            "entry_type": entry.entry_type,
+            "title": entry.title,
+            "status": entry.status,
+            "severity": entry.severity,
+        },
+    )
+    db.commit()
+    db.refresh(entry)
+    return _blackboard_entry_read(entry)
+
+
+def list_project_blackboard_entries(
+    db: Session,
+    project_id: str,
+    entry_type: str | None = None,
+    status: str | None = None,
+) -> list[schemas.BlackboardEntryRead]:
+    _one(db, models.Project, project_id)
+    query = (
+        select(models.BlackboardEntry)
+        .where(models.BlackboardEntry.project_id == project_id)
+        .order_by(models.BlackboardEntry.created_at)
+    )
+    if entry_type is not None:
+        query = query.where(models.BlackboardEntry.entry_type == entry_type)
+    if status is not None:
+        query = query.where(models.BlackboardEntry.status == status)
+    return [_blackboard_entry_read(entry) for entry in db.scalars(query).all()]
+
+
+def get_blackboard_entry(db: Session, entry_id: str) -> schemas.BlackboardEntryRead:
+    return _blackboard_entry_read(_one(db, models.BlackboardEntry, entry_id))
+
+
+def update_blackboard_entry_status(
+    db: Session, entry_id: str, data: schemas.BlackboardEntryStatusUpdate
+) -> schemas.BlackboardEntryRead:
+    entry = _one(db, models.BlackboardEntry, entry_id)
+    old_status = entry.status
+    entry.status = data.status
+    db.flush()
+    project = _one(db, models.Project, entry.project_id)
+    _audit(
+        db,
+        entity_type="blackboard_entry",
+        entity_id=entry.id,
+        action="status_changed",
+        actor_user_id=entry.author_user_id,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={"old_status": old_status, "new_status": entry.status},
+    )
+    db.commit()
+    db.refresh(entry)
+    return _blackboard_entry_read(entry)
+
+
+def create_deliberation_record(
+    db: Session, project_id: str, data: schemas.DeliberationRecordCreate
+) -> schemas.DeliberationRecordRead:
+    project = _one(db, models.Project, project_id)
+    _one(db, models.User, str(data.created_by_user_id))
+
+    linked_entry_ids = [str(entry_id) for entry_id in data.linked_entry_ids]
+    for entry_id in linked_entry_ids:
+        entry = _one(db, models.BlackboardEntry, entry_id)
+        if entry.project_id != project.id:
+            raise ValidationError("linked blackboard entry does not belong to project")
+
+    record = models.DeliberationRecord(
+        project_id=project.id,
+        created_by_user_id=str(data.created_by_user_id),
+        phase=data.phase,
+        question=data.question,
+        priority_inputs_json=json.dumps(data.priority_inputs.model_dump(), sort_keys=True),
+        linked_entry_ids_json=json.dumps(linked_entry_ids),
+        recommended_next_action=data.recommended_next_action,
+        rationale=data.rationale,
+        result_json=json.dumps(data.result, sort_keys=True),
+        status="open",
+    )
+    db.add(record)
+    db.flush()
+    _audit(
+        db,
+        entity_type="deliberation_record",
+        entity_id=record.id,
+        action="created",
+        actor_user_id=record.created_by_user_id,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={
+            "phase": record.phase,
+            "status": record.status,
+            "linked_entry_count": len(linked_entry_ids),
+        },
+    )
+    db.commit()
+    db.refresh(record)
+    return _deliberation_record_read(record)
+
+
+def list_project_deliberation_records(
+    db: Session, project_id: str
+) -> list[schemas.DeliberationRecordRead]:
+    _one(db, models.Project, project_id)
+    records = db.scalars(
+        select(models.DeliberationRecord)
+        .where(models.DeliberationRecord.project_id == project_id)
+        .order_by(models.DeliberationRecord.created_at)
+    ).all()
+    return [_deliberation_record_read(record) for record in records]
+
+
+def get_deliberation_record(
+    db: Session, deliberation_id: str
+) -> schemas.DeliberationRecordRead:
+    return _deliberation_record_read(_one(db, models.DeliberationRecord, deliberation_id))

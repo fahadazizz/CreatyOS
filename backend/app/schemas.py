@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class OrmModel(BaseModel):
@@ -14,6 +14,20 @@ def _strip_nonempty(value: str) -> str:
     if not stripped:
         raise ValueError("must not be empty")
     return stripped
+
+
+def _require_payload_keys(
+    payload: dict[str, Any], entry_type: str, required_keys: tuple[str, ...]
+) -> None:
+    missing = [
+        key
+        for key in required_keys
+        if key not in payload or payload[key] is None or payload[key] == ""
+    ]
+    if missing:
+        raise ValueError(
+            f"{entry_type} payload requires: {', '.join(required_keys)}"
+        )
 
 
 class WorkspaceCreate(BaseModel):
@@ -338,3 +352,152 @@ class CreativeInputRead(OrmModel):
     candidate_state: CandidateState
     body: dict[str, Any]
     created_at: datetime
+
+
+BlackboardEntryType = Literal[
+    "observation",
+    "proposal",
+    "contradiction",
+    "missing_information",
+    "risk",
+    "issue",
+    "proof_request",
+    "task_recommendation",
+]
+BlackboardEntryStatus = Literal["open", "accepted", "rejected", "resolved", "superseded"]
+BlackboardSeverity = Literal["low", "medium", "high", "critical"]
+DeliberationPhase = Literal[
+    "sense",
+    "frame",
+    "diverge",
+    "externalize",
+    "experience",
+    "critique",
+    "decide",
+    "commit",
+    "propagate",
+    "reopen",
+]
+DeliberationStatus = Literal["open", "recorded", "superseded"]
+
+
+BLACKBOARD_PAYLOAD_REQUIREMENTS: dict[BlackboardEntryType, tuple[str, ...]] = {
+    "observation": ("observation", "evidence"),
+    "proposal": ("proposal_type", "recommended_action", "expected_impact"),
+    "contradiction": ("contradiction", "conflicts_with"),
+    "missing_information": ("question", "needed_for"),
+    "risk": ("risk_type", "impact", "mitigation"),
+    "issue": ("issue_type", "impact", "mitigation"),
+    "proof_request": (
+        "proof_type",
+        "question",
+        "acceptance_test",
+        "cheapest_useful_proof",
+    ),
+    "task_recommendation": (
+        "task_type",
+        "recommended_owner",
+        "acceptance_criteria",
+    ),
+}
+
+
+class BlackboardEntryCreate(BaseModel):
+    author_user_id: UUID
+    entry_type: BlackboardEntryType
+    title: str = Field(min_length=1, max_length=240)
+    summary: str = Field(min_length=1, max_length=4000)
+    rationale: str = Field(min_length=1, max_length=4000)
+    confidence_level: ConfidenceLevel
+    severity: BlackboardSeverity
+    payload: dict[str, Any]
+    target_artifact_id: UUID | None = None
+    target_artifact_version_id: UUID | None = None
+    target_decision_id: UUID | None = None
+    target_creative_input_id: UUID | None = None
+
+    _title = field_validator("title")(_strip_nonempty)
+    _summary = field_validator("summary")(_strip_nonempty)
+    _rationale = field_validator("rationale")(_strip_nonempty)
+
+    @model_validator(mode="after")
+    def validate_structured_payload(self) -> "BlackboardEntryCreate":
+        if not self.payload:
+            raise ValueError("payload must not be empty")
+        _require_payload_keys(
+            self.payload,
+            self.entry_type,
+            BLACKBOARD_PAYLOAD_REQUIREMENTS[self.entry_type],
+        )
+        return self
+
+
+class BlackboardEntryRead(OrmModel):
+    id: UUID
+    project_id: UUID
+    author_user_id: UUID
+    entry_type: str
+    title: str
+    summary: str
+    rationale: str
+    confidence_level: str
+    severity: str
+    status: str
+    payload: dict[str, Any]
+    target_artifact_id: UUID | None
+    target_artifact_version_id: UUID | None
+    target_decision_id: UUID | None
+    target_creative_input_id: UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class BlackboardEntryStatusUpdate(BaseModel):
+    status: BlackboardEntryStatus
+
+
+class DeliberationPriorityInputs(BaseModel):
+    creative_impact: int = Field(ge=1, le=5)
+    uncertainty: int = Field(ge=1, le=5)
+    irreversibility: int = Field(ge=1, le=5)
+    cost_of_delay: int = Field(ge=1, le=5)
+    proof_cost: int = Field(ge=1, le=5)
+    dependency_blockage: int = Field(ge=1, le=5)
+
+
+class DeliberationRecordCreate(BaseModel):
+    created_by_user_id: UUID
+    phase: DeliberationPhase
+    question: str = Field(min_length=1, max_length=4000)
+    priority_inputs: DeliberationPriorityInputs
+    linked_entry_ids: list[UUID] = Field(default_factory=list, max_length=100)
+    recommended_next_action: str = Field(min_length=1, max_length=4000)
+    rationale: str = Field(min_length=1, max_length=4000)
+    result: dict[str, Any] = Field(default_factory=dict)
+
+    _question = field_validator("question")(_strip_nonempty)
+    _recommended_next_action = field_validator("recommended_next_action")(_strip_nonempty)
+    _rationale = field_validator("rationale")(_strip_nonempty)
+
+    @field_validator("linked_entry_ids")
+    @classmethod
+    def validate_linked_entry_ids(cls, value: list[UUID]) -> list[UUID]:
+        if len(set(value)) != len(value):
+            raise ValueError("linked_entry_ids must not contain duplicates")
+        return value
+
+
+class DeliberationRecordRead(OrmModel):
+    id: UUID
+    project_id: UUID
+    created_by_user_id: UUID
+    phase: str
+    question: str
+    priority_inputs: DeliberationPriorityInputs
+    linked_entry_ids: list[UUID]
+    recommended_next_action: str
+    rationale: str
+    result: dict[str, Any]
+    status: str
+    created_at: datetime
+    updated_at: datetime
