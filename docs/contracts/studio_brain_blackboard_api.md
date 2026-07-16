@@ -107,6 +107,7 @@ Deliberation record fields:
 - `GET /api/v1/blackboard-entries/{entry_id}`
 - `PATCH /api/v1/blackboard-entries/{entry_id}/status`
 - `POST /api/v1/projects/{project_id}/deliberations`
+- `POST /api/v1/projects/{project_id}/deliberation-controller-runs`
 - `GET /api/v1/projects/{project_id}/deliberations`
 - `GET /api/v1/deliberations/{deliberation_id}`
 - `POST /api/v1/projects/{project_id}/specialist-proposals`

@@ -63,7 +63,11 @@ Out of scope:
 
 ## Phase 2.3 - Deliberation Controller
 
-**Status:** not started
+**Status:** implemented
+
+- Deterministically ranks open blackboard entries by priority inputs.
+- Creates a recorded deliberation record for the selected next action.
+- Does not accept proposals, approve work, call models, or mutate source-of-truth records.
 
 ## Phase 2.4 - Human Checkpoint Protocol
 

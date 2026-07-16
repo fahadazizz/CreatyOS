@@ -524,6 +524,28 @@ class DeliberationRecordRead(OrmModel):
     updated_at: datetime
 
 
+class DeliberationControllerRunCreate(BaseModel):
+    created_by_user_id: UUID
+    question: str = Field(default="What is the next most useful creative action?", max_length=4000)
+
+    _question = field_validator("question")(_strip_nonempty)
+
+
+class DeliberationCandidateRead(BaseModel):
+    blackboard_entry_id: UUID
+    entry_type: str
+    title: str
+    recommended_action: str
+    priority_inputs: DeliberationPriorityInputs
+    priority_score: float
+
+
+class DeliberationControllerRunRead(BaseModel):
+    deliberation_record: DeliberationRecordRead
+    selected_candidate: DeliberationCandidateRead
+    ranked_candidates: list[DeliberationCandidateRead]
+
+
 class SpecialistProposalCreate(BaseModel):
     submitted_by_user_id: UUID
     specialist_type: SpecialistType

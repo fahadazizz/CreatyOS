@@ -310,6 +310,22 @@ async def create_deliberation_record(
         _handle_error(exc)
 
 
+@router.post(
+    "/projects/{project_id}/deliberation-controller-runs",
+    response_model=schemas.DeliberationControllerRunRead,
+    status_code=201,
+)
+async def run_deliberation_controller(
+    project_id: UUID,
+    payload: schemas.DeliberationControllerRunCreate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return services.run_deliberation_controller(db, str(project_id), payload)
+    except Exception as exc:
+        _handle_error(exc)
+
+
 @router.get(
     "/projects/{project_id}/deliberations",
     response_model=list[schemas.DeliberationRecordRead],

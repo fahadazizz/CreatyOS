@@ -83,6 +83,8 @@ Phase 2.1 Studio Brain blackboard tests verify:
 
 Phase 2.2 specialist proposal tests verify linked blackboard proposal creation, supported specialist validation, cross-project target rejection, audit events, and no source-of-truth mutation.
 
+Phase 2.3 deliberation controller tests verify deterministic ranking, recorded deliberation/audit output, empty-project rejection, and no source-of-truth mutation.
+
 Run Alembic migrations:
 
 ```bash

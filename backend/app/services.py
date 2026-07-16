@@ -827,6 +827,177 @@ def update_blackboard_entry_status(
     return _blackboard_entry_read(entry)
 
 
+_SEVERITY_SCORE = {"low": 1, "medium": 2, "high": 4, "critical": 5}
+_CONFIDENCE_UNCERTAINTY = {"high": 1, "medium": 3, "low": 5}
+_ENTRY_IMPACT = {
+    "proof_request": 5,
+    "risk": 5,
+    "issue": 4,
+    "contradiction": 4,
+    "missing_information": 4,
+    "proposal": 3,
+    "task_recommendation": 3,
+    "observation": 2,
+}
+_ENTRY_IRREVERSIBILITY = {
+    "proof_request": 5,
+    "risk": 5,
+    "issue": 4,
+    "contradiction": 4,
+    "missing_information": 3,
+    "proposal": 3,
+    "task_recommendation": 2,
+    "observation": 2,
+}
+_ENTRY_PROOF_COST = {
+    "proof_request": 2,
+    "risk": 3,
+    "issue": 3,
+    "contradiction": 3,
+    "missing_information": 2,
+    "proposal": 3,
+    "task_recommendation": 3,
+    "observation": 4,
+}
+
+
+def _priority_inputs_for_entry(
+    entry: models.BlackboardEntry,
+) -> schemas.DeliberationPriorityInputs:
+    payload = json.loads(entry.payload_json)
+    dependency_blockage = 5 if entry.entry_type in {
+        "proof_request",
+        "risk",
+        "issue",
+        "missing_information",
+    } else 3
+    if payload.get("needed_for") or payload.get("acceptance_test"):
+        dependency_blockage = 5
+
+    return schemas.DeliberationPriorityInputs(
+        creative_impact=_ENTRY_IMPACT[entry.entry_type],
+        uncertainty=_CONFIDENCE_UNCERTAINTY[entry.confidence_level],
+        irreversibility=_ENTRY_IRREVERSIBILITY[entry.entry_type],
+        cost_of_delay=_SEVERITY_SCORE[entry.severity],
+        proof_cost=_ENTRY_PROOF_COST[entry.entry_type],
+        dependency_blockage=dependency_blockage,
+    )
+
+
+def _priority_score(priority_inputs: schemas.DeliberationPriorityInputs) -> float:
+    numerator = (
+        priority_inputs.creative_impact
+        * priority_inputs.uncertainty
+        * priority_inputs.irreversibility
+        * priority_inputs.cost_of_delay
+        * priority_inputs.dependency_blockage
+    )
+    return round(numerator / priority_inputs.proof_cost, 2)
+
+
+def _recommended_action_for_entry(entry: models.BlackboardEntry) -> str:
+    payload = json.loads(entry.payload_json)
+    if entry.entry_type == "proof_request":
+        return f"Request proof: {payload['cheapest_useful_proof']}"
+    if entry.entry_type == "proposal":
+        return payload["recommended_action"]
+    if entry.entry_type == "risk":
+        return f"Mitigate risk: {payload['mitigation']}"
+    if entry.entry_type == "issue":
+        return f"Resolve issue: {payload['mitigation']}"
+    if entry.entry_type == "missing_information":
+        return f"Answer missing information: {payload['question']}"
+    if entry.entry_type == "contradiction":
+        return f"Resolve contradiction: {payload['contradiction']}"
+    if entry.entry_type == "task_recommendation":
+        return payload["acceptance_criteria"]
+    return f"Review observation: {payload['observation']}"
+
+
+def _deliberation_candidate_read(
+    entry: models.BlackboardEntry,
+) -> schemas.DeliberationCandidateRead:
+    priority_inputs = _priority_inputs_for_entry(entry)
+    return schemas.DeliberationCandidateRead.model_validate(
+        {
+            "blackboard_entry_id": entry.id,
+            "entry_type": entry.entry_type,
+            "title": entry.title,
+            "recommended_action": _recommended_action_for_entry(entry),
+            "priority_inputs": priority_inputs,
+            "priority_score": _priority_score(priority_inputs),
+        }
+    )
+
+
+def run_deliberation_controller(
+    db: Session, project_id: str, data: schemas.DeliberationControllerRunCreate
+) -> schemas.DeliberationControllerRunRead:
+    project = _one(db, models.Project, project_id)
+    _one(db, models.User, str(data.created_by_user_id))
+    entries = db.scalars(
+        select(models.BlackboardEntry)
+        .where(models.BlackboardEntry.project_id == project.id)
+        .where(models.BlackboardEntry.status == "open")
+        .order_by(models.BlackboardEntry.created_at)
+    ).all()
+    if not entries:
+        raise ValidationError("deliberation controller requires at least one open blackboard entry")
+
+    ranked_candidates = sorted(
+        [_deliberation_candidate_read(entry) for entry in entries],
+        key=lambda candidate: (-candidate.priority_score, str(candidate.blackboard_entry_id)),
+    )
+    selected = ranked_candidates[0]
+    record = models.DeliberationRecord(
+        project_id=project.id,
+        created_by_user_id=str(data.created_by_user_id),
+        phase="decide",
+        question=data.question,
+        priority_inputs_json=json.dumps(selected.priority_inputs.model_dump(), sort_keys=True),
+        linked_entry_ids_json=json.dumps([str(selected.blackboard_entry_id)]),
+        recommended_next_action=selected.recommended_action,
+        rationale=(
+            "Deterministic priority heuristic selected the open entry with the highest "
+            "impact, uncertainty, irreversibility, delay cost, and blockage relative to proof cost."
+        ),
+        result_json=json.dumps(
+            {
+                "controller": "deterministic_v1",
+                "selected_blackboard_entry_id": str(selected.blackboard_entry_id),
+                "ranked_candidates": [
+                    candidate.model_dump(mode="json") for candidate in ranked_candidates
+                ],
+            },
+            sort_keys=True,
+        ),
+        status="recorded",
+    )
+    db.add(record)
+    db.flush()
+    _audit(
+        db,
+        entity_type="deliberation_record",
+        entity_id=record.id,
+        action="controller_ran",
+        actor_user_id=record.created_by_user_id,
+        workspace_id=project.workspace_id,
+        project_id=project.id,
+        payload={
+            "selected_blackboard_entry_id": str(selected.blackboard_entry_id),
+            "selected_priority_score": selected.priority_score,
+            "candidate_count": len(ranked_candidates),
+        },
+    )
+    db.commit()
+    db.refresh(record)
+    return schemas.DeliberationControllerRunRead(
+        deliberation_record=_deliberation_record_read(record),
+        selected_candidate=selected,
+        ranked_candidates=ranked_candidates,
+    )
+
+
 def create_deliberation_record(
     db: Session, project_id: str, data: schemas.DeliberationRecordCreate
 ) -> schemas.DeliberationRecordRead:
